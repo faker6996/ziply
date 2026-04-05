@@ -8,11 +8,20 @@ Ziply is a cross-platform desktop archive utility for macOS, Windows, and Linux.
 ![CI](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/ci.yml?branch=main&label=ci)
 ![Installers](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/build-installers.yml?branch=main&label=installers)
 
+## Native-Only Rule
+
+Ziply only claims formats that it handles itself.
+
+- no external archive helper apps
+- no runtime shell-out to archive tools
+- no hidden dependency on another archive utility
+
+If a format is not implemented natively inside this repository, it stays out of active support.
+
 ## What Ziply Does Today
 
 - Compress and extract archives from one desktop workspace
-- Support `zip`, `tar`, `tar.gz`, `tar.xz`, `gz`, and `7z` natively
-- Extract `rar` archives through compatible external tools when they exist on the machine
+- Support `zip`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, `xz`, `bz2`, `gz`, and `7z` natively
 - Preview archive contents before extraction
 - Search preview results and progressively load more entries
 - Extract everything or only selected entries for supported formats
@@ -22,17 +31,36 @@ Ziply is a cross-platform desktop archive utility for macOS, Windows, and Linux.
 - Accept drag and drop for files, folders, and archives
 - Support password flows for encrypted `7z` creation and password-protected `zip` / `7z` extraction
 
+## Product Direction
+
+Ziply is not treating `all formats` as “every archive format ever invented”.
+
+The rule is:
+
+1. Every format listed as supported in the app must be native.
+2. Every format listed as supported in this README must be backed by native code in Ziply.
+3. Formats that are still under investigation stay in `planned`, not `supported`.
+
 ## Supported Formats
 
 | Format | Compress | Extract | Preview | Selective Extract | Notes |
 | ------ | -------- | ------- | ------- | ----------------- | ----- |
-| ZIP | ✅ | ✅ | ✅ | ✅ | Deflate compression. Password and AES support are extract-only right now |
+| ZIP | ✅ | ✅ | ✅ | ✅ | Deflate compression. Password-protected ZIP creation is supported. AES extraction is supported when reading ZIP archives |
 | TAR | ✅ | ✅ | ✅ | ✅ | Pure TAR |
 | TAR.GZ | ✅ | ✅ | ✅ | ✅ | Gzip-compressed tar |
+| TAR.BZ2 | ✅ | ✅ | ✅ | ✅ | Bzip2-compressed tar |
 | TAR.XZ | ✅ | ✅ | ✅ | ✅ | XZ-compressed tar |
+| XZ | ✅ | ✅ | ✅ | ❌ | Compression supports exactly one file |
+| BZ2 | ✅ | ✅ | ✅ | ❌ | Compression supports exactly one file |
 | GZ | ✅ | ✅ | ✅ | ❌ | Compression supports exactly one file |
 | 7Z | ✅ | ✅ | ✅ | ✅ | Powered by `sevenz-rust2`. Supports encrypted archive creation and extraction |
-| RAR | ❌ | ✅ | ❌ | ❌ | Requires `unar`, `7z`, `7zz`, or `unrar` on the host machine |
+| RAR | ❌ | ❌ | ❌ | ❌ | Not supported yet |
+
+## Planned Native Formats
+
+These are not supported yet and should be treated as roadmap only:
+
+- `rar` if native implementation quality and licensing are acceptable
 
 ## Current Product Scope
 
@@ -47,9 +75,24 @@ Ziply is a cross-platform desktop archive utility for macOS, Windows, and Linux.
 - Drag-and-drop workspace that routes archives to extract and regular files or folders to compress
 - Shell-intent handling for open, extract, extract-here, and compress launch flows
 
+### Native quality coverage
+
+The current native archive test suite covers:
+
+- round-trip archive creation and extraction for the supported native formats
+- fixture-based compatibility checks for `zip`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, raw stream formats, and `7z` archives produced outside Ziply
+- unicode filenames
+- empty files and empty directories
+- large binary payloads for raw stream formats
+- preview limits and hidden-entry counts
+- selective extract behavior
+- password success and wrong-password failure paths for `7z`
+- unsafe ZIP path rejection during extraction
+
 ### Password support
 
 - Create encrypted `7z` archives
+- Create password-protected `zip` archives
 - Extract password-protected `7z` archives
 - Extract password-protected `zip` archives, including AES-backed ZIPs
 
@@ -77,9 +120,9 @@ For extraction, conflict handling currently applies at the destination level, no
 
 ## Known Limits
 
-- Creating encrypted ZIP archives is not implemented yet
-- `rar` support depends on external tools and does not currently support preview or selective extract
-- `gz` preview is single-stream oriented and selective extract is not applicable
+- ZIP creation supports password-protected output. Use `7z` when you want the stronger encryption option already shipped in Ziply
+- `rar` is not supported yet
+- `gz`, `xz`, and `bz2` preview are single-stream oriented and selective extract is not applicable
 - Batch jobs currently run one at a time
 - Finder-specific custom context-menu actions on macOS still need a dedicated extension or Quick Action path
 
@@ -155,7 +198,7 @@ If release infrastructure is not configured yet, install from source instead.
 - Desktop shell: Tauri 2
 - Backend language: Rust
 - Native dialogs: `@tauri-apps/plugin-dialog`
-- Archive libraries: `zip`, `tar`, `flate2`, `xz2`, `sevenz-rust2`
+- Archive libraries: `zip`, `tar`, `flate2`, `bzip2`, `xz2`, `sevenz-rust2`
 
 ## Repository Layout
 
@@ -172,9 +215,10 @@ ziply/
 │   ├── src/history.rs        # persisted operation history
 │   ├── src/models.rs         # request and response models
 │   ├── src/shell.rs          # OS shell integration helpers
-│   └── src/commands/         # Tauri command layer
+│   ├── src/commands/         # Tauri command layer
+│   └── tests/fixtures/compat # compatibility archives generated from system tools
 ├── packaging/homebrew/       # Homebrew cask templates and tap skeleton
-├── scripts/                  # release and packaging helper scripts
+├── scripts/                  # release and packaging helper scripts, including fixture generation
 └── .github/workflows/        # CI and release automation
 ```
 
@@ -183,16 +227,21 @@ ziply/
 Ziply ships with two workflows:
 
 - `ci.yml`
+  - Checks version consistency across `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`
   - Runs `npm run lint`
   - Runs `npm run build:web`
   - Runs `cargo fmt --all --check`
   - Runs `cargo test --manifest-path src-tauri/Cargo.toml`
   - Runs `cargo check --manifest-path src-tauri/Cargo.toml`
+  - Runs `npm run build -- --ci --no-bundle` on macOS, Windows, and Linux as a cross-platform smoke build
 - `build-installers.yml`
+  - Checks version consistency before building installers
   - Builds DMG, NSIS, and DEB installers
+  - Verifies installer artifacts exist, are non-empty, and have the expected file type before upload
   - Uploads installer artifacts
   - Auto-tags the current app version from `main`
   - Publishes a GitHub Release
+  - Verifies downloaded release assets again before publishing the release
   - Updates the Homebrew tap when Homebrew credentials are configured
   - Publishes the APT repository to GitHub Pages when APT signing secrets are configured
 
@@ -222,6 +271,15 @@ npm run lint
 npm run build:web
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
+
+Current local status:
+
+- `npm run lint` passes
+- `npm run build:web` passes
+- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `35` tests
+- `bash scripts/check-version-consistency.sh` passes
+
+For the full native-only roadmap and promotion rules for new formats, see [PLAN.md](/Users/tran_van_bach/Desktop/project/ziply/PLAN.md).
 
 ## License
 

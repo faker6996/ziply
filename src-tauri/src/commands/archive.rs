@@ -4,12 +4,14 @@ use tauri::AppHandle;
 
 use crate::{
     archive::{
-        create_7z_archive, create_gz_archive, create_tar_archive, create_tar_gz_archive,
-        create_tar_xz_archive, create_zip_archive, extract_7z_archive, extract_gz_archive,
-        extract_rar_archive, extract_tar_archive, extract_tar_gz_archive, extract_tar_xz_archive,
-        extract_zip_archive, normalize_archive_path, normalize_destination_path,
-        normalize_directory_path, normalize_password, normalize_source_paths, path_to_string,
-        prepare_extract_destination, preview_archive, resolve_archive_output_path,
+        create_7z_archive, create_bz2_archive, create_gz_archive, create_tar_archive,
+        create_tar_bz2_archive, create_tar_gz_archive, create_tar_xz_archive, create_xz_archive,
+        create_zip_archive, extract_7z_archive, extract_bz2_archive, extract_gz_archive,
+        extract_tar_archive, extract_tar_bz2_archive, extract_tar_gz_archive,
+        extract_tar_xz_archive, extract_xz_archive, extract_zip_archive, normalize_archive_path,
+        normalize_destination_path, normalize_directory_path, normalize_password,
+        normalize_source_paths, path_to_string, prepare_extract_destination, preview_archive,
+        resolve_archive_output_path,
     },
     history::{
         append_archive_history, archive_history_id, archive_job_id, emit_archive_job_event,
@@ -54,20 +56,28 @@ pub(crate) fn compress_archive(
         },
     );
 
-    if matches!(format, ArchiveFormat::Gz) {
+    if matches!(
+        format,
+        ArchiveFormat::Gz | ArchiveFormat::Xz | ArchiveFormat::Bz2
+    ) {
         if source_paths.len() != 1 {
-            return Err("gz compression currently supports exactly one source file.".to_string());
+            return Err(format!(
+                "{} compression currently supports exactly one source file.",
+                format.label()
+            ));
         }
         if source_paths[0].is_dir() {
-            return Err(
-                "gz compression only works with a single file, not a directory.".to_string(),
-            );
+            return Err(format!(
+                "{} compression only works with a single file, not a directory.",
+                format.label()
+            ));
         }
     }
 
-    if password.is_some() && !matches!(format, ArchiveFormat::SevenZip) {
+    if password.is_some() && !matches!(format, ArchiveFormat::Zip | ArchiveFormat::SevenZip) {
         return Err(
-            "password-protected archive creation is currently supported for 7z only.".to_string(),
+            "password-protected archive creation is currently supported for zip and 7z only."
+                .to_string(),
         );
     }
 
@@ -96,80 +106,80 @@ pub(crate) fn compress_archive(
         },
     );
 
-    let execution =
-        (|| -> Result<ArchiveActionResult, String> {
-            emit_archive_job_event(
-                &app,
-                ArchiveJobEvent {
-                    job_id: job_id.clone(),
-                    operation: "compress".to_string(),
-                    format: format.label().to_string(),
-                    stage: "processing".to_string(),
-                    status: "running".to_string(),
-                    message: format!("Creating {} archive contents.", format.label()),
-                    progress: 58,
-                    source_summary: source_summary.clone(),
-                    output_path: Some(path_to_string(&destination_path)),
-                    timestamp_ms: unix_timestamp_ms(),
-                },
-            );
+    let execution = (|| -> Result<ArchiveActionResult, String> {
+        emit_archive_job_event(
+            &app,
+            ArchiveJobEvent {
+                job_id: job_id.clone(),
+                operation: "compress".to_string(),
+                format: format.label().to_string(),
+                stage: "processing".to_string(),
+                status: "running".to_string(),
+                message: format!("Creating {} archive contents.", format.label()),
+                progress: 58,
+                source_summary: source_summary.clone(),
+                output_path: Some(path_to_string(&destination_path)),
+                timestamp_ms: unix_timestamp_ms(),
+            },
+        );
 
-            match format {
-                ArchiveFormat::Zip => create_zip_archive(&source_paths, &destination_path)?,
-                ArchiveFormat::Tar => create_tar_archive(&source_paths, &destination_path)?,
-                ArchiveFormat::TarGz => create_tar_gz_archive(&source_paths, &destination_path)?,
-                ArchiveFormat::TarXz => create_tar_xz_archive(&source_paths, &destination_path)?,
-                ArchiveFormat::Gz => create_gz_archive(&source_paths[0], &destination_path)?,
-                ArchiveFormat::SevenZip => {
-                    create_7z_archive(&source_paths, &destination_path, password.as_deref())?
-                }
-                ArchiveFormat::Rar => return Err(
-                    "rar compression is not supported. Use zip, tar, tar.gz, gz, or 7z instead."
-                        .to_string(),
-                ),
+        match format {
+            ArchiveFormat::Zip => {
+                create_zip_archive(&source_paths, &destination_path, password.as_deref())?
             }
+            ArchiveFormat::Tar => create_tar_archive(&source_paths, &destination_path)?,
+            ArchiveFormat::TarGz => create_tar_gz_archive(&source_paths, &destination_path)?,
+            ArchiveFormat::TarBz2 => create_tar_bz2_archive(&source_paths, &destination_path)?,
+            ArchiveFormat::TarXz => create_tar_xz_archive(&source_paths, &destination_path)?,
+            ArchiveFormat::Xz => create_xz_archive(&source_paths[0], &destination_path)?,
+            ArchiveFormat::Bz2 => create_bz2_archive(&source_paths[0], &destination_path)?,
+            ArchiveFormat::Gz => create_gz_archive(&source_paths[0], &destination_path)?,
+            ArchiveFormat::SevenZip => {
+                create_7z_archive(&source_paths, &destination_path, password.as_deref())?
+            }
+        }
 
-            emit_archive_job_event(
-                &app,
-                ArchiveJobEvent {
-                    job_id: job_id.clone(),
-                    operation: "compress".to_string(),
-                    format: format.label().to_string(),
-                    stage: "finalizing".to_string(),
-                    status: "running".to_string(),
-                    message: "Finalizing archive and saving recent activity.".to_string(),
-                    progress: 88,
-                    source_summary: source_summary.clone(),
-                    output_path: Some(path_to_string(&destination_path)),
-                    timestamp_ms: unix_timestamp_ms(),
-                },
-            );
+        emit_archive_job_event(
+            &app,
+            ArchiveJobEvent {
+                job_id: job_id.clone(),
+                operation: "compress".to_string(),
+                format: format.label().to_string(),
+                stage: "finalizing".to_string(),
+                status: "running".to_string(),
+                message: "Finalizing archive and saving recent activity.".to_string(),
+                progress: 88,
+                source_summary: source_summary.clone(),
+                output_path: Some(path_to_string(&destination_path)),
+                timestamp_ms: unix_timestamp_ms(),
+            },
+        );
 
-            let result = ArchiveActionResult {
-                operation: "compress",
-                format: format.label(),
-                output_path: path_to_string(&destination_path),
-                message: format!(
-                    "Created {} archive at {}",
-                    format.label(),
-                    destination_path.display()
-                ),
-            };
+        let result = ArchiveActionResult {
+            operation: "compress",
+            format: format.label(),
+            output_path: path_to_string(&destination_path),
+            message: format!(
+                "Created {} archive at {}",
+                format.label(),
+                destination_path.display()
+            ),
+        };
 
-            append_archive_history(
-                &app,
-                ArchiveHistoryEntry {
-                    id: archive_history_id(),
-                    operation: "compress".to_string(),
-                    format: format.label().to_string(),
-                    source_summary: source_summary.clone(),
-                    output_path: result.output_path.clone(),
-                    timestamp_ms: unix_timestamp_ms(),
-                },
-            )?;
+        append_archive_history(
+            &app,
+            ArchiveHistoryEntry {
+                id: archive_history_id(),
+                operation: "compress".to_string(),
+                format: format.label().to_string(),
+                source_summary: source_summary.clone(),
+                output_path: result.output_path.clone(),
+                timestamp_ms: unix_timestamp_ms(),
+            },
+        )?;
 
-            Ok(result)
-        })();
+        Ok(result)
+    })();
 
     match execution {
         Ok(result) => {
@@ -238,7 +248,11 @@ pub(crate) fn extract_archive(
             "{} • {} selected entr{}",
             path_to_string(&archive_path),
             selected_entries.len(),
-            if selected_entries.len() == 1 { "y" } else { "ies" }
+            if selected_entries.len() == 1 {
+                "y"
+            } else {
+                "ies"
+            }
         )
     };
 
@@ -250,10 +264,13 @@ pub(crate) fn extract_archive(
     }
 
     if !selected_entries.is_empty()
-        && matches!(format, ArchiveFormat::Gz | ArchiveFormat::Rar)
+        && matches!(
+            format,
+            ArchiveFormat::Gz | ArchiveFormat::Xz | ArchiveFormat::Bz2
+        )
     {
         return Err(
-            "selective extraction is currently supported for zip, tar, tar.gz, tar.xz, and 7z archives only."
+            "selective extraction is currently supported for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z archives only."
                 .to_string(),
         );
     }
@@ -308,18 +325,23 @@ pub(crate) fn extract_archive(
         );
 
         match format {
-            ArchiveFormat::Zip => {
-                extract_zip_archive(
-                    &archive_path,
-                    &destination_directory,
-                    password.as_deref(),
-                    Some(&selected_entries),
-                )?
-            }
-            ArchiveFormat::Tar => {
-                extract_tar_archive(&archive_path, &destination_directory, Some(&selected_entries))?
-            }
+            ArchiveFormat::Zip => extract_zip_archive(
+                &archive_path,
+                &destination_directory,
+                password.as_deref(),
+                Some(&selected_entries),
+            )?,
+            ArchiveFormat::Tar => extract_tar_archive(
+                &archive_path,
+                &destination_directory,
+                Some(&selected_entries),
+            )?,
             ArchiveFormat::TarGz => extract_tar_gz_archive(
+                &archive_path,
+                &destination_directory,
+                Some(&selected_entries),
+            )?,
+            ArchiveFormat::TarBz2 => extract_tar_bz2_archive(
                 &archive_path,
                 &destination_directory,
                 Some(&selected_entries),
@@ -329,16 +351,15 @@ pub(crate) fn extract_archive(
                 &destination_directory,
                 Some(&selected_entries),
             )?,
+            ArchiveFormat::Xz => extract_xz_archive(&archive_path, &destination_directory)?,
+            ArchiveFormat::Bz2 => extract_bz2_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::Gz => extract_gz_archive(&archive_path, &destination_directory)?,
-            ArchiveFormat::SevenZip => {
-                extract_7z_archive(
-                    &archive_path,
-                    &destination_directory,
-                    password.as_deref(),
-                    Some(&selected_entries),
-                )?
-            }
-            ArchiveFormat::Rar => extract_rar_archive(&archive_path, &destination_directory)?,
+            ArchiveFormat::SevenZip => extract_7z_archive(
+                &archive_path,
+                &destination_directory,
+                password.as_deref(),
+                Some(&selected_entries),
+            )?,
         }
 
         emit_archive_job_event(
@@ -371,7 +392,11 @@ pub(crate) fn extract_archive(
                 format!(
                     "Extracted {} selected entr{} from {} archive into {}",
                     selected_entries.len(),
-                    if selected_entries.len() == 1 { "y" } else { "ies" },
+                    if selected_entries.len() == 1 {
+                        "y"
+                    } else {
+                        "ies"
+                    },
                     format.label(),
                     destination_directory.display()
                 )

@@ -129,6 +129,10 @@ export function preferredArchiveExtension(format: CompressFormat) {
     return '.tar.gz'
   }
 
+  if (format === 'tar.bz2') {
+    return '.tar.bz2'
+  }
+
   if (format === 'tar.xz') {
     return '.tar.xz'
   }
@@ -148,7 +152,7 @@ export function suggestArchiveName(format: CompressFormat, sourcePaths: string[]
 }
 
 function stripArchiveExtension(path: string) {
-  return path.replace(/\.(tar\.gz|tar\.xz|tgz|txz|zip|tar|gz|7z|rar|xz)$/i, '')
+  return path.replace(/\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|bz2|gz|7z|xz)$/i, '')
 }
 
 function parentDirectory(path: string) {
@@ -168,11 +172,11 @@ export function suggestExtractDestination(archivePath: string, extractHere: bool
 }
 
 export function isArchivePath(path: string) {
-  return /\.(tar\.gz|tar\.xz|tgz|txz|zip|tar|gz|7z|rar)$/i.test(path.trim())
+  return /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|bz2|gz|7z|xz)$/i.test(path.trim())
 }
 
 export function supportsArchivePasswordOnCompress(format: CompressFormat) {
-  return format === '7z'
+  return format === 'zip' || format === '7z'
 }
 
 export function supportsArchivePasswordOnExtract(path: string) {
@@ -180,7 +184,7 @@ export function supportsArchivePasswordOnExtract(path: string) {
 }
 
 export function supportsSelectiveExtract(path: string) {
-  return /\.(tar\.gz|tar\.xz|tgz|txz|zip|tar|7z)$/i.test(path.trim())
+  return /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|7z)$/i.test(path.trim())
 }
 
 function pathSegments(path: string) {
@@ -211,11 +215,15 @@ export function inferArchiveFormatFromPath(path: string) {
     return 'tar.gz'
   }
 
+  if (normalized.endsWith('.tar.bz2') || normalized.endsWith('.tbz2')) {
+    return 'tar.bz2'
+  }
+
   if (normalized.endsWith('.tar.xz') || normalized.endsWith('.txz')) {
     return 'tar.xz'
   }
 
-  const match = normalized.match(/\.(zip|tar|gz|7z|rar)$/)
+  const match = normalized.match(/\.(zip|tar|bz2|gz|7z|xz)$/)
   return match?.[1] ?? 'archive'
 }
 
@@ -264,16 +272,16 @@ export function recoveryHintForArchiveError(message: string) {
     return 'Check the archive password, then run the job again. Encrypted archives cannot be previewed or extracted without the correct password.'
   }
 
-  if (normalized.includes('password-protected archive creation is currently supported for 7z only')) {
-    return 'Switch the output format to 7z if you need encryption, or remove the password for zip, tar, tar.gz, tar.xz, or gz.'
+  if (normalized.includes('password-protected archive creation is currently supported for zip and 7z only')) {
+    return 'Use zip or 7z when you need password protection. Choose 7z when you want the stronger encryption path already shipped in Ziply.'
   }
 
   if (normalized.includes('password-based extraction is currently supported for zip and 7z archives only')) {
     return 'Remove the password for this archive type, or use a zip or 7z archive if encrypted extraction is required.'
   }
 
-  if (normalized.includes('selective extraction is currently supported for zip, tar, tar.gz, tar.xz, and 7z archives only')) {
-    return 'Use full extraction for gz or rar archives. Selective extraction is available for zip, tar, tar.gz, tar.xz, and 7z.'
+  if (normalized.includes('selective extraction is currently supported for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z archives only')) {
+    return 'Use full extraction for gz, bz2, and xz archives. Selective extraction is available for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z.'
   }
 
   if (normalized.includes('destination archive already exists')) {
@@ -288,28 +296,24 @@ export function recoveryHintForArchiveError(message: string) {
     return 'Re-select the file or folder. The original path may have moved, been renamed, or is no longer mounted.'
   }
 
-  if (normalized.includes('rar extraction requires an external tool')) {
-    return 'Install one of these backends on this machine: unar, 7zz, 7z, or unrar, then refresh Ziply shell capabilities.'
-  }
-
-  if (normalized.includes('preview is not available for rar yet')) {
-    return 'Extract the rar archive directly, or install a rar backend first if the archive cannot be opened yet.'
-  }
-
   if (normalized.includes('unsupported archive extension') || normalized.includes('unsupported archive format')) {
-    return 'Use one of the supported formats: zip, tar, tar.gz, tar.xz, gz, 7z, and rar extraction when a backend is installed.'
+    return 'Use one of the supported formats: zip, tar, tar.gz, tar.bz2, tar.xz, xz, bz2, gz, or 7z.'
   }
 
-  if (normalized.includes('rar compression is not supported')) {
-    return 'Choose zip, tar, tar.gz, tar.xz, gz, or 7z as the output format. Rar creation is not available in Ziply.'
+  if (
+    normalized.includes('gz compression currently supports exactly one source file') ||
+    normalized.includes('xz compression currently supports exactly one source file') ||
+    normalized.includes('bz2 compression currently supports exactly one source file')
+  ) {
+    return 'Keep only one source file for gz, xz, or bz2 compression. Use tar.gz, tar.bz2, or tar.xz if you need to package multiple files or folders together.'
   }
 
-  if (normalized.includes('gz compression currently supports exactly one source file')) {
-    return 'Keep only one source file for gz compression. Use tar.gz if you need to package multiple files or folders together.'
-  }
-
-  if (normalized.includes('gz compression only works with a single file, not a directory')) {
-    return 'Pick one file instead of a folder, or switch to tar.gz when you need directory compression.'
+  if (
+    normalized.includes('gz compression only works with a single file, not a directory') ||
+    normalized.includes('xz compression only works with a single file, not a directory') ||
+    normalized.includes('bz2 compression only works with a single file, not a directory')
+  ) {
+    return 'Pick one file instead of a folder, or switch to tar.gz, tar.bz2, or tar.xz when you need directory compression.'
   }
 
   return undefined

@@ -1,7 +1,4 @@
-use crate::{
-    archive::rar_extractor_label,
-    models::{AppOverview, ArchiveCapabilities},
-};
+use crate::models::{AppOverview, ArchiveCapabilities};
 
 #[tauri::command]
 pub(crate) fn app_overview() -> AppOverview {
@@ -14,16 +11,18 @@ pub(crate) fn app_overview() -> AppOverview {
             "Extract common archive formats",
             "Keep one workflow across three desktop operating systems",
         ],
-        active_formats: ["zip", "tar", "tar.gz", "tgz", "tar.xz", "txz", "gz", "7z"],
+        active_formats: [
+            "zip", "tar", "tar.gz", "tgz", "tar.bz2", "tbz2", "tar.xz", "txz", "xz", "bz2", "gz",
+            "7z",
+        ],
         planned_formats: ["rar"],
     }
 }
 
 #[tauri::command]
 pub(crate) fn archive_capabilities() -> ArchiveCapabilities {
-    let rar_extractor = rar_extractor_label();
     ArchiveCapabilities {
-        rar_extraction_available: rar_extractor.is_some(),
-        rar_extractor_label: rar_extractor,
+        native_archive_only: true,
+        unsupported_formats: ["rar"],
     }
 }

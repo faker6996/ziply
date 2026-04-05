@@ -29,3 +29,4 @@ apps/desktop/**/*.tsbuildinfo
 apps/desktop/coverage/
 
 src-tauri/gen/
+src-tauri/tests/

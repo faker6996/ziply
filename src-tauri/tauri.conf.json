@@ -60,13 +60,6 @@
         "role": "Viewer"
       },
       {
-        "ext": ["rar"],
-        "name": "RAR Archive",
-        "description": "Ziply RAR archive",
-        "mimeType": "application/vnd.rar",
-        "role": "Viewer"
-      },
-      {
         "ext": ["tar"],
         "name": "TAR Archive",
         "description": "Ziply TAR archive",
@@ -74,14 +67,21 @@
         "role": "Viewer"
       },
       {
-        "ext": ["tgz", "gz"],
+        "ext": ["tar.gz", "tgz", "gz"],
         "name": "GZip Archive",
         "description": "Ziply GZip archive",
         "mimeType": "application/gzip",
         "role": "Viewer"
       },
       {
-        "ext": ["txz", "xz"],
+        "ext": ["tar.bz2", "tbz2", "bz2"],
+        "name": "BZip2 Archive",
+        "description": "Ziply BZip2 archive",
+        "mimeType": "application/x-bzip2",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["tar.xz", "txz", "xz"],
         "name": "XZ Archive",
         "description": "Ziply XZ archive",
         "mimeType": "application/x-xz",

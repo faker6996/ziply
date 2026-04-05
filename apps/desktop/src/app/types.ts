@@ -8,8 +8,8 @@ export interface AppOverview {
 }
 
 export interface ArchiveCapabilities {
-  rarExtractionAvailable: boolean
-  rarExtractorLabel: string | null
+  nativeArchiveOnly: boolean
+  unsupportedFormats: string[]
 }
 
 export interface ArchiveActionResult {
@@ -57,7 +57,16 @@ export interface ShellIntegrationStatus {
   note: string
 }
 
-export type CompressFormat = 'zip' | 'tar' | 'tar.gz' | 'tar.xz' | 'gz' | '7z'
+export type CompressFormat =
+  | 'zip'
+  | 'tar'
+  | 'tar.gz'
+  | 'tar.bz2'
+  | 'tar.xz'
+  | 'xz'
+  | 'bz2'
+  | 'gz'
+  | '7z'
 export type ConflictPolicy = 'keepBoth' | 'overwrite' | 'stop'
 export type ActionStatus = 'idle' | 'running' | 'success' | 'error'
 export type QueueJobStatus = 'queued' | 'running' | 'success' | 'error'

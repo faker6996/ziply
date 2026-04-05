@@ -94,7 +94,7 @@ function App() {
                 : 'Desktop runtime connected'}
           </strong>
           <p>
-            Real archive commands are live for zip, tar, tar.gz, tgz, tar.xz, txz, gz, and 7z.
+            Real native archive commands are live for zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, and 7z.
           </p>
         </div>
       </section>
@@ -134,7 +134,6 @@ function App() {
         />
 
         <ExtractForm
-          capabilities={capabilities}
           desktopShell={desktopShell}
           extractDestination={extractDestination}
           extractConflictPolicy={extractConflictPolicy}

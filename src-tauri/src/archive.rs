@@ -1,12 +1,13 @@
 use std::{
-    env,
-    ffi::OsString,
     fs::{self, File},
     io::{self, BufReader, BufWriter, Read, Seek, Write},
     path::{Component, Path, PathBuf},
-    process::Command,
 };
 
+#[cfg(target_os = "linux")]
+use std::{env, ffi::OsString};
+
+use bzip2::{read::BzDecoder, write::BzEncoder, Compression as BzCompression};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use sevenz_rust2::{
     decompress_file, decompress_file_with_password, encoder_options::AesEncoderOptions,
@@ -15,6 +16,7 @@ use sevenz_rust2::{
 use tar::Builder as TarBuilder;
 use walkdir::WalkDir;
 use xz2::{read::XzDecoder, write::XzEncoder};
+use zip::unstable::write::FileOptionsExt;
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::models::{ArchiveFormat, ArchivePreviewEntry, ArchivePreviewResult, ConflictPolicy};
@@ -62,6 +64,16 @@ pub(crate) fn normalize_destination_path(
 
     if matches!(format, ArchiveFormat::TarXz) {
         if lower.ends_with(".tar.xz") || lower.ends_with(".txz") {
+            return Ok(PathBuf::from(trimmed));
+        }
+        return Ok(PathBuf::from(format!(
+            "{trimmed}{}",
+            format.preferred_suffix()
+        )));
+    }
+
+    if matches!(format, ArchiveFormat::TarBz2) {
+        if lower.ends_with(".tar.bz2") || lower.ends_with(".tbz2") {
             return Ok(PathBuf::from(trimmed));
         }
         return Ok(PathBuf::from(format!(
@@ -191,6 +203,7 @@ pub(crate) fn prepare_extract_destination(
 pub(crate) fn create_zip_archive(
     source_paths: &[PathBuf],
     destination_path: &Path,
+    password: Option<&str>,
 ) -> Result<(), String> {
     let file = File::create(destination_path).map_err(|error| {
         format!(
@@ -200,9 +213,10 @@ pub(crate) fn create_zip_archive(
     })?;
     let writer = BufWriter::new(file);
     let mut archive = ZipWriter::new(writer);
+    let normalized_password = normalize_password(password);
 
     for source_path in source_paths {
-        append_zip_source(&mut archive, source_path)?;
+        append_zip_source(&mut archive, source_path, normalized_password.as_deref())?;
     }
 
     archive
@@ -214,16 +228,22 @@ pub(crate) fn create_zip_archive(
 fn append_zip_source<W: Write + Seek>(
     archive: &mut ZipWriter<W>,
     source_path: &Path,
+    password: Option<&str>,
 ) -> Result<(), String> {
     let options = FileOptions::default()
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
+    let file_options = if let Some(password) = password {
+        options.with_deprecated_encryption(password.as_bytes())
+    } else {
+        options
+    };
 
     if source_path.is_file() {
         let archive_name = source_path
             .file_name()
             .ok_or_else(|| format!("source path has no file name: {}", source_path.display()))?;
-        return append_zip_file(archive, source_path, Path::new(archive_name), options);
+        return append_zip_file(archive, source_path, Path::new(archive_name), file_options);
     }
 
     let source_parent = source_path.parent().unwrap_or_else(|| Path::new(""));
@@ -242,7 +262,7 @@ fn append_zip_source<W: Write + Seek>(
             continue;
         }
 
-        append_zip_file(archive, path, relative_path, options)?;
+        append_zip_file(archive, path, relative_path, file_options)?;
     }
 
     Ok(())
@@ -343,6 +363,29 @@ pub(crate) fn create_tar_xz_archive(
     Ok(())
 }
 
+pub(crate) fn create_tar_bz2_archive(
+    source_paths: &[PathBuf],
+    destination_path: &Path,
+) -> Result<(), String> {
+    let file = File::create(destination_path).map_err(|error| {
+        format!(
+            "failed to create archive {}: {error}",
+            destination_path.display()
+        )
+    })?;
+    let encoder = BzEncoder::new(BufWriter::new(file), BzCompression::default());
+    let mut archive = TarBuilder::new(encoder);
+
+    for source_path in source_paths {
+        append_tar_source(&mut archive, source_path)?;
+    }
+
+    archive
+        .finish()
+        .map_err(|error| format!("failed to finalize tar.bz2 archive: {error}"))?;
+    Ok(())
+}
+
 fn append_tar_source<W: Write>(
     archive: &mut TarBuilder<W>,
     source_path: &Path,
@@ -385,6 +428,57 @@ pub(crate) fn create_gz_archive(source_path: &Path, destination_path: &Path) -> 
     encoder
         .finish()
         .map_err(|error| format!("failed to finalize gz archive: {error}"))?;
+    Ok(())
+}
+
+pub(crate) fn create_xz_archive(source_path: &Path, destination_path: &Path) -> Result<(), String> {
+    let input_file = File::open(source_path).map_err(|error| {
+        format!(
+            "failed to open source file {}: {error}",
+            source_path.display()
+        )
+    })?;
+    let output_file = File::create(destination_path).map_err(|error| {
+        format!(
+            "failed to create archive {}: {error}",
+            destination_path.display()
+        )
+    })?;
+    let mut reader = BufReader::new(input_file);
+    let mut encoder = XzEncoder::new(BufWriter::new(output_file), 6);
+
+    io::copy(&mut reader, &mut encoder)
+        .map_err(|error| format!("failed to write xz archive: {error}"))?;
+    encoder
+        .finish()
+        .map_err(|error| format!("failed to finalize xz archive: {error}"))?;
+    Ok(())
+}
+
+pub(crate) fn create_bz2_archive(
+    source_path: &Path,
+    destination_path: &Path,
+) -> Result<(), String> {
+    let input_file = File::open(source_path).map_err(|error| {
+        format!(
+            "failed to open source file {}: {error}",
+            source_path.display()
+        )
+    })?;
+    let output_file = File::create(destination_path).map_err(|error| {
+        format!(
+            "failed to create archive {}: {error}",
+            destination_path.display()
+        )
+    })?;
+    let mut reader = BufReader::new(input_file);
+    let mut encoder = BzEncoder::new(BufWriter::new(output_file), BzCompression::default());
+
+    io::copy(&mut reader, &mut encoder)
+        .map_err(|error| format!("failed to write bz2 archive: {error}"))?;
+    encoder
+        .finish()
+        .map_err(|error| format!("failed to finalize bz2 archive: {error}"))?;
     Ok(())
 }
 
@@ -448,7 +542,10 @@ pub(crate) fn extract_zip_archive(
         let relative_path = entry
             .enclosed_name()
             .ok_or_else(|| format!("zip entry contains an unsafe path: {}", entry.name()))?;
-        if !should_extract_entry(&relative_path.to_string_lossy(), selected_entries.as_deref()) {
+        if !should_extract_entry(
+            &relative_path.to_string_lossy(),
+            selected_entries.as_deref(),
+        ) {
             continue;
         }
         let output_path = destination_directory.join(relative_path);
@@ -525,6 +622,18 @@ pub(crate) fn extract_tar_xz_archive(
     unpack_tar_entries(&mut archive, destination_directory, selected_entries)
 }
 
+pub(crate) fn extract_tar_bz2_archive(
+    archive_path: &Path,
+    destination_directory: &Path,
+    selected_entries: Option<&[String]>,
+) -> Result<(), String> {
+    let file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let decoder = BzDecoder::new(BufReader::new(file));
+    let mut archive = tar::Archive::new(decoder);
+    unpack_tar_entries(&mut archive, destination_directory, selected_entries)
+}
+
 fn unpack_tar_entries<R: Read>(
     archive: &mut tar::Archive<R>,
     destination_directory: &Path,
@@ -542,7 +651,10 @@ fn unpack_tar_entries<R: Read>(
             .path()
             .map_err(|error| format!("failed to read tar archive entry path: {error}"))?
             .into_owned();
-        if !should_extract_entry(&relative_path.to_string_lossy(), selected_entries.as_deref()) {
+        if !should_extract_entry(
+            &relative_path.to_string_lossy(),
+            selected_entries.as_deref(),
+        ) {
             continue;
         }
         let output_path = safe_join(destination_directory, &relative_path)?;
@@ -593,6 +705,70 @@ pub(crate) fn extract_gz_archive(
     io::copy(&mut decoder, &mut writer).map_err(|error| {
         format!(
             "failed to extract gz archive into {}: {error}",
+            output_path.display()
+        )
+    })?;
+    Ok(())
+}
+
+pub(crate) fn extract_xz_archive(
+    archive_path: &Path,
+    destination_directory: &Path,
+) -> Result<(), String> {
+    let output_name = archive_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .and_then(|value| value.strip_suffix(".xz"))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "xz archive name must end with .xz".to_string())?;
+    let output_path = destination_directory.join(output_name);
+
+    let input_file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let mut decoder = XzDecoder::new(BufReader::new(input_file));
+    let output_file = File::create(&output_path).map_err(|error| {
+        format!(
+            "failed to create extracted file {}: {error}",
+            output_path.display()
+        )
+    })?;
+    let mut writer = BufWriter::new(output_file);
+
+    io::copy(&mut decoder, &mut writer).map_err(|error| {
+        format!(
+            "failed to extract xz archive into {}: {error}",
+            output_path.display()
+        )
+    })?;
+    Ok(())
+}
+
+pub(crate) fn extract_bz2_archive(
+    archive_path: &Path,
+    destination_directory: &Path,
+) -> Result<(), String> {
+    let output_name = archive_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .and_then(|value| value.strip_suffix(".bz2"))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "bz2 archive name must end with .bz2".to_string())?;
+    let output_path = destination_directory.join(output_name);
+
+    let input_file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let mut decoder = BzDecoder::new(BufReader::new(input_file));
+    let output_file = File::create(&output_path).map_err(|error| {
+        format!(
+            "failed to create extracted file {}: {error}",
+            output_path.display()
+        )
+    })?;
+    let mut writer = BufWriter::new(output_file);
+
+    io::copy(&mut decoder, &mut writer).map_err(|error| {
+        format!(
+            "failed to extract bz2 archive into {}: {error}",
             output_path.display()
         )
     })?;
@@ -685,18 +861,6 @@ fn should_extract_entry(entry_path: &str, selected_entries: Option<&[String]>) -
     })
 }
 
-pub(crate) fn extract_rar_archive(
-    archive_path: &Path,
-    destination_directory: &Path,
-) -> Result<(), String> {
-    let extractor = detect_rar_extractor().ok_or_else(|| {
-        "rar extraction requires an external tool. Install one of: unar, 7zz, 7z, or unrar."
-            .to_string()
-    })?;
-
-    run_external_rar_extract(&extractor, archive_path, destination_directory)
-}
-
 pub(crate) fn preview_archive(
     archive_path: &Path,
     limit: usize,
@@ -706,124 +870,43 @@ pub(crate) fn preview_archive(
     let visible_limit = limit.max(1);
 
     match format {
-        ArchiveFormat::Zip => preview_zip_archive(archive_path, visible_limit),
+        ArchiveFormat::Zip => preview_zip_archive(archive_path, visible_limit, password),
         ArchiveFormat::Tar => preview_tar_archive(archive_path, visible_limit),
         ArchiveFormat::TarGz => preview_tar_gz_archive(archive_path, visible_limit),
+        ArchiveFormat::TarBz2 => preview_tar_bz2_archive(archive_path, visible_limit),
         ArchiveFormat::TarXz => preview_tar_xz_archive(archive_path, visible_limit),
+        ArchiveFormat::Xz => preview_xz_archive(archive_path),
+        ArchiveFormat::Bz2 => preview_bz2_archive(archive_path),
         ArchiveFormat::Gz => preview_gz_archive(archive_path),
         ArchiveFormat::SevenZip => preview_7z_archive(archive_path, visible_limit, password),
-        ArchiveFormat::Rar => Ok(ArchivePreviewResult {
-            format: format.label(),
-            total_entries: 0,
-            visible_entries: Vec::new(),
-            hidden_entry_count: 0,
-            note: Some(
-                "Preview is not available for rar yet. You can still extract it if a rar backend is installed."
-                    .to_string(),
-            ),
-        }),
     }
 }
 
-pub(crate) fn rar_extractor_label() -> Option<String> {
-    detect_rar_extractor().map(|extractor| extractor.label().to_string())
-}
-
-#[derive(Clone)]
-enum RarExtractor {
-    Unar(PathBuf),
-    SevenZip(PathBuf),
-    Unrar(PathBuf),
-}
-
-impl RarExtractor {
-    fn label(&self) -> &str {
-        match self {
-            Self::Unar(_) => "unar",
-            Self::SevenZip(_) => "7z-compatible backend",
-            Self::Unrar(_) => "unrar",
-        }
-    }
-}
-
-fn detect_rar_extractor() -> Option<RarExtractor> {
-    find_command(&["unar"])
-        .map(RarExtractor::Unar)
-        .or_else(|| find_command(&["7zz", "7z"]).map(RarExtractor::SevenZip))
-        .or_else(|| find_command(&["unrar"]).map(RarExtractor::Unrar))
-}
-
-fn run_external_rar_extract(
-    extractor: &RarExtractor,
+fn preview_zip_archive(
     archive_path: &Path,
-    destination_directory: &Path,
-) -> Result<(), String> {
-    let mut command = match extractor {
-        RarExtractor::Unar(binary) => {
-            let mut command = Command::new(binary);
-            command.arg("-force-overwrite");
-            command.arg("-output-directory");
-            command.arg(destination_directory);
-            command.arg(archive_path);
-            command
-        }
-        RarExtractor::SevenZip(binary) => {
-            let mut command = Command::new(binary);
-            command.arg("x");
-            command.arg(archive_path);
-            command.arg(format!("-o{}", destination_directory.display()));
-            command.arg("-y");
-            command
-        }
-        RarExtractor::Unrar(binary) => {
-            let mut command = Command::new(binary);
-            command.arg("x");
-            command.arg("-o+");
-            command.arg(archive_path);
-            command.arg(destination_directory);
-            command
-        }
-    };
-
-    let output = command.output().map_err(|error| {
-        format!(
-            "failed to start {} for rar extraction: {error}",
-            extractor.label()
-        )
-    })?;
-
-    if output.status.success() {
-        return Ok(());
-    }
-
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let detail = if !stderr.is_empty() { stderr } else { stdout };
-    Err(if detail.is_empty() {
-        format!(
-            "{} failed while extracting the rar archive",
-            extractor.label()
-        )
-    } else {
-        format!(
-            "{} failed while extracting the rar archive: {detail}",
-            extractor.label()
-        )
-    })
-}
-
-fn preview_zip_archive(archive_path: &Path, limit: usize) -> Result<ArchivePreviewResult, String> {
+    limit: usize,
+    password: Option<&str>,
+) -> Result<ArchivePreviewResult, String> {
     let file = File::open(archive_path)
         .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
     let mut archive =
         ZipArchive::new(file).map_err(|error| format!("failed to read zip archive: {error}"))?;
     let total_entries = archive.len();
     let mut visible_entries = Vec::with_capacity(total_entries.min(limit));
+    let normalized_password = normalize_password(password);
 
     for index in 0..total_entries.min(limit) {
-        let entry = archive
-            .by_index(index)
-            .map_err(|error| format!("failed to read zip entry: {error}"))?;
+        let entry = if let Some(password) = normalized_password.as_deref() {
+            match archive.by_index_decrypt(index, password.as_bytes()) {
+                Ok(Ok(entry)) => entry,
+                Ok(Err(_)) => return Err("invalid password for zip archive.".to_string()),
+                Err(error) => return Err(format!("failed to read zip entry: {error}")),
+            }
+        } else {
+            archive
+                .by_index(index)
+                .map_err(|error| format!("failed to read zip entry: {error}"))?
+        };
         visible_entries.push(ArchivePreviewEntry {
             path: entry.name().to_string(),
             kind: if entry.is_dir() { "directory" } else { "file" },
@@ -872,6 +955,17 @@ fn preview_tar_xz_archive(
     let decoder = XzDecoder::new(BufReader::new(file));
     let archive = tar::Archive::new(decoder);
     collect_tar_preview(archive, "tar.xz", limit)
+}
+
+fn preview_tar_bz2_archive(
+    archive_path: &Path,
+    limit: usize,
+) -> Result<ArchivePreviewResult, String> {
+    let file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let decoder = BzDecoder::new(BufReader::new(file));
+    let archive = tar::Archive::new(decoder);
+    collect_tar_preview(archive, "tar.bz2", limit)
 }
 
 fn collect_tar_preview<R: Read>(
@@ -943,6 +1037,54 @@ fn preview_gz_archive(archive_path: &Path) -> Result<ArchivePreviewResult, Strin
     })
 }
 
+fn preview_bz2_archive(archive_path: &Path) -> Result<ArchivePreviewResult, String> {
+    let output_name = archive_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .and_then(|value| value.strip_suffix(".bz2"))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "bz2 archive name must end with .bz2".to_string())?;
+
+    Ok(ArchivePreviewResult {
+        format: "bz2",
+        total_entries: 1,
+        hidden_entry_count: 0,
+        visible_entries: vec![ArchivePreviewEntry {
+            path: output_name.to_string(),
+            kind: "file",
+            size: None,
+        }],
+        note: Some(
+            "Bzip2 archives usually contain a single file stream without folder structure."
+                .to_string(),
+        ),
+    })
+}
+
+fn preview_xz_archive(archive_path: &Path) -> Result<ArchivePreviewResult, String> {
+    let output_name = archive_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .and_then(|value| value.strip_suffix(".xz"))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "xz archive name must end with .xz".to_string())?;
+
+    Ok(ArchivePreviewResult {
+        format: "xz",
+        total_entries: 1,
+        hidden_entry_count: 0,
+        visible_entries: vec![ArchivePreviewEntry {
+            path: output_name.to_string(),
+            kind: "file",
+            size: None,
+        }],
+        note: Some(
+            "XZ archives usually contain a single file stream without folder structure."
+                .to_string(),
+        ),
+    })
+}
+
 fn preview_7z_archive(
     archive_path: &Path,
     limit: usize,
@@ -983,6 +1125,7 @@ fn preview_7z_archive(
     })
 }
 
+#[cfg(target_os = "linux")]
 pub(crate) fn find_command(candidates: &[&str]) -> Option<PathBuf> {
     let path_os = env::var_os("PATH")?;
     let extensions = command_extensions();
@@ -1006,22 +1149,7 @@ pub(crate) fn find_command(candidates: &[&str]) -> Option<PathBuf> {
     None
 }
 
-#[cfg(windows)]
-fn command_extensions() -> Vec<String> {
-    env::var("PATHEXT")
-        .ok()
-        .map(|value| {
-            value
-                .split(';')
-                .filter(|entry| !entry.is_empty())
-                .map(|entry| entry.to_ascii_lowercase())
-                .collect()
-        })
-        .filter(|extensions: &Vec<String>| !extensions.is_empty())
-        .unwrap_or_else(|| vec![".exe".to_string(), ".cmd".to_string(), ".bat".to_string()])
-}
-
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 fn command_extensions() -> Vec<String> {
     vec![String::new()]
 }
@@ -1098,7 +1226,7 @@ fn split_conflict_name(file_name: &str, is_directory: bool) -> (String, String) 
         return (file_name.to_string(), String::new());
     }
 
-    for suffix in [".tar.gz", ".tar.xz"] {
+    for suffix in [".tar.gz", ".tar.bz2", ".tar.xz"] {
         if let Some(base_name) = file_name.strip_suffix(suffix) {
             return (base_name.to_string(), suffix.to_string());
         }

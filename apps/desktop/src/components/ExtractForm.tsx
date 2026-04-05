@@ -2,7 +2,6 @@ import { useDeferredValue, useState, type FormEvent } from 'react'
 import { conflictPolicyOptions } from '../app/defaults'
 import type {
   ActionFeedback,
-  ArchiveCapabilities,
   ArchivePreviewResult,
   ConflictPolicy,
 } from '../app/types'
@@ -16,7 +15,6 @@ interface ExtractFormProps {
   extractConflictPolicy: ConflictPolicy
   extractPassword: string
   selectedEntries: string[]
-  capabilities: ArchiveCapabilities
   feedback: ActionFeedback
   preview: ArchivePreviewResult | null
   previewLimit: number
@@ -48,7 +46,6 @@ export function ExtractForm({
   extractConflictPolicy,
   extractPassword,
   selectedEntries,
-  capabilities,
   feedback,
   preview,
   previewLimit,
@@ -134,11 +131,9 @@ export function ExtractForm({
             Browse
           </button>
         </div>
-        <small>Supported now: zip, tar, tar.gz, tgz, tar.xz, txz, gz, and 7z.</small>
+        <small>Supported now: zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, and 7z.</small>
         <small>
-          {capabilities.rarExtractionAvailable
-            ? `rar extraction is available through ${capabilities.rarExtractorLabel}.`
-            : 'rar extraction needs an installed backend such as unar, 7zz, 7z, or unrar.'}
+          RAR is not supported yet. Ziply only ships native archive handlers.
         </small>
       </label>
 
@@ -252,7 +247,7 @@ export function ExtractForm({
             </label>
             {!supportsSelectiveExtract(extractSource) && preview.format ? (
               <p className="archive-preview__note">
-                Selective extract is currently available for zip, tar, tar.gz, tar.xz, and 7z.
+                Selective extract is currently available for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z.
               </p>
             ) : null}
             <div className="archive-preview__list">

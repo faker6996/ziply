@@ -25,16 +25,22 @@ jobs:
             platform: macos-latest
             build_args: "--bundles dmg --target universal-apple-darwin --ci --no-sign"
             artifact_name: ziply-macos-dmg
+            artifact_dir: target/universal-apple-darwin/release/bundle/dmg
+            artifact_extension: dmg
             artifact_path: target/universal-apple-darwin/release/bundle/dmg/*.dmg
           - name: Windows Setup EXE
             platform: windows-latest
             build_args: "--bundles nsis --ci --no-sign"
             artifact_name: ziply-windows-setup
+            artifact_dir: target/release/bundle/nsis
+            artifact_extension: exe
             artifact_path: target/release/bundle/nsis/*.exe
           - name: Linux DEB
             platform: ubuntu-22.04
             build_args: "--bundles deb --ci --no-sign"
             artifact_name: ziply-linux-deb
+            artifact_dir: target/release/bundle/deb
+            artifact_extension: deb
             artifact_path: target/release/bundle/deb/*.deb
 
     steps:
@@ -69,6 +75,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check version consistency
+        run: bash scripts/check-version-consistency.sh
+
       - name: Build installer
         run: npm run build -- ${{ matrix.build_args }}
 
@@ -76,6 +85,35 @@ jobs:
         if: always()
         shell: bash
         run: find target -type f | sort | grep '/bundle/' || true
+
+      - name: Verify installer artifact
+        shell: bash
+        env:
+          ARTIFACT_DIR: ${{ matrix.artifact_dir }}
+          ARTIFACT_EXTENSION: ${{ matrix.artifact_extension }}
+        run: |
+          if [ ! -d "$ARTIFACT_DIR" ]; then
+            echo "Expected artifact directory does not exist: $ARTIFACT_DIR"
+            exit 1
+          fi
+
+          mapfile -t files < <(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name "*.$ARTIFACT_EXTENSION" | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No .$ARTIFACT_EXTENSION artifacts found in $ARTIFACT_DIR"
+            exit 1
+          fi
+
+          printf 'Verified installer artifacts:\n'
+          for file in "${files[@]}"; do
+            if [ ! -s "$file" ]; then
+              echo "Artifact is empty: $file"
+              exit 1
+            fi
+
+            size_bytes="$(wc -c < "$file" | tr -d ' ')"
+            checksum="$(sha256sum "$file" | awk '{print $1}')"
+            printf ' - %s (%s bytes) sha256=%s\n' "$file" "$size_bytes" "$checksum"
+          done
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v6
@@ -103,34 +141,9 @@ jobs:
         id: version
         shell: bash
         run: |
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
-          CARGO_VERSION="$(awk '
-            /^\[package\]$/ { in_section = 1; next }
-            /^\[/ { if (in_section == 1) { exit } }
-            in_section && /^version = / {
-              gsub(/^version = "/, "", $0)
-              gsub(/"$/, "", $0)
-              print
-              exit
-            }
-          ' src-tauri/Cargo.toml)"
-
-          if [ -z "$PACKAGE_VERSION" ] || [ -z "$TAURI_VERSION" ] || [ -z "$CARGO_VERSION" ]; then
-            echo "Unable to determine one or more versions."
-            exit 1
-          fi
-
-          if [ "$PACKAGE_VERSION" != "$TAURI_VERSION" ] || [ "$PACKAGE_VERSION" != "$CARGO_VERSION" ]; then
-            echo "Version mismatch detected."
-            echo "package.json: $PACKAGE_VERSION"
-            echo "src-tauri/tauri.conf.json: $TAURI_VERSION"
-            echo "src-tauri/Cargo.toml: $CARGO_VERSION"
-            exit 1
-          fi
-
-          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          VERSION="$(bash scripts/check-version-consistency.sh)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Check if version tag already exists
         id: tag_check
@@ -190,6 +203,41 @@ jobs:
         with:
           name: ziply-linux-deb
           path: release-assets/linux
+
+      - name: Verify downloaded release assets
+        shell: bash
+        run: |
+          verify_one() {
+            local label="$1"
+            local directory="$2"
+            local extension="$3"
+
+            if [ ! -d "$directory" ]; then
+              echo "Missing release asset directory for $label: $directory"
+              exit 1
+            fi
+
+            mapfile -t files < <(find "$directory" -maxdepth 1 -type f -name "*.$extension" | sort)
+            if [ "${#files[@]}" -eq 0 ]; then
+              echo "No .$extension release assets found for $label in $directory"
+              exit 1
+            fi
+
+            printf '%s assets:\n' "$label"
+            for file in "${files[@]}"; do
+              if [ ! -s "$file" ]; then
+                echo "Downloaded release asset is empty: $file"
+                exit 1
+              fi
+
+              size_bytes="$(wc -c < "$file" | tr -d ' ')"
+              printf ' - %s (%s bytes)\n' "$file" "$size_bytes"
+            done
+          }
+
+          verify_one "macOS" "release-assets/macos" "dmg"
+          verify_one "Windows" "release-assets/windows" "exe"
+          verify_one "Linux" "release-assets/linux" "deb"
 
       - name: Generate checksums
         shell: bash

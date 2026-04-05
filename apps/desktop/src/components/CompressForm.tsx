@@ -168,14 +168,16 @@ export function CompressForm({
         />
         <small>
           {supportsPasswordOnCompress(compressFormat)
-            ? '7z archives can be encrypted with AES-256 when a password is set.'
-            : 'Password-protected archive creation is currently available for 7z only.'}
+            ? compressFormat === '7z'
+              ? '7z archives can be encrypted with AES-256 when a password is set.'
+              : 'ZIP archives can be created with a password. Use 7z when you want the stronger encryption option.'
+            : 'Password-protected archive creation is currently available for zip and 7z only.'}
         </small>
       </label>
 
-      {compressFormat === 'gz' ? (
+      {compressFormat === 'gz' || compressFormat === 'xz' || compressFormat === 'bz2' ? (
         <p className={`inline-note ${gzipSourceCount === 1 ? '' : 'inline-note--warning'}`}>
-          `gz` currently works with exactly one file and does not accept directories.
+          `{compressFormat}` currently works with exactly one file and does not accept directories.
         </p>
       ) : null}
 

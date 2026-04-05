@@ -116,7 +116,8 @@ fn archive_display_name(path: &Path) -> Option<String> {
     let file_name = path.file_name()?.to_str()?;
     let lower = file_name.to_ascii_lowercase();
     let suffixes = [
-        ".tar.gz", ".tar.xz", ".tgz", ".txz", ".zip", ".tar", ".gz", ".7z", ".rar", ".xz",
+        ".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".zip", ".tar", ".bz2", ".gz",
+        ".7z", ".xz",
     ];
 
     for suffix in suffixes {
@@ -165,7 +166,10 @@ fn install_windows_shell_integration(executable: &Path) -> Result<(), String> {
     let extract_command = format!("\"{}\" --extract \"%1\"", executable.display());
     let extract_here_command = format!("\"{}\" --extract-here \"%1\"", executable.display());
     let compress_command = format!("\"{}\" --compress \"%1\"", executable.display());
-    let archive_extensions = [".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".txz", ".xz"];
+    let archive_extensions = [
+        ".zip", ".7z", ".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".gz", ".bz2", ".tgz", ".tbz2",
+        ".txz", ".xz",
+    ];
 
     for extension in archive_extensions {
         let base_key = format!(r"HKCU\Software\Classes\SystemFileAssociations\{extension}\shell");
@@ -284,7 +288,7 @@ pub(crate) fn install_current_shell_integration() -> Result<(), String> {
     })?;
 
     let desktop_entry = format!(
-        "[Desktop Entry]\nType=Application\nName=Ziply\nComment=Compress and extract archives with Ziply\nExec=\"{exe}\" %F\nTerminal=false\nCategories=Utility;Archiving;\nMimeType=application/zip;application/x-7z-compressed;application/vnd.rar;application/x-rar;application/x-tar;application/gzip;application/x-compressed-tar;application/x-xz-compressed-tar;\nActions=ExtractWithZiply;ExtractHereWithZiply;CompressWithZiply;\n\n[Desktop Action ExtractWithZiply]\nName=Extract with Ziply\nExec=\"{exe}\" --extract %f\n\n[Desktop Action ExtractHereWithZiply]\nName=Extract here with Ziply\nExec=\"{exe}\" --extract-here %f\n\n[Desktop Action CompressWithZiply]\nName=Compress with Ziply\nExec=\"{exe}\" --compress %F\n",
+        "[Desktop Entry]\nType=Application\nName=Ziply\nComment=Compress and extract archives with Ziply\nExec=\"{exe}\" %F\nTerminal=false\nCategories=Utility;Archiving;\nMimeType=application/zip;application/x-7z-compressed;application/x-tar;application/gzip;application/x-bzip2;application/x-bzip-compressed-tar;application/x-compressed-tar;application/x-xz-compressed-tar;\nActions=ExtractWithZiply;ExtractHereWithZiply;CompressWithZiply;\n\n[Desktop Action ExtractWithZiply]\nName=Extract with Ziply\nExec=\"{exe}\" --extract %f\n\n[Desktop Action ExtractHereWithZiply]\nName=Extract here with Ziply\nExec=\"{exe}\" --extract-here %f\n\n[Desktop Action CompressWithZiply]\nName=Compress with Ziply\nExec=\"{exe}\" --compress %F\n",
         exe = executable.display()
     );
 

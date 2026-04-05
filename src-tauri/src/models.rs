@@ -9,15 +9,15 @@ pub(crate) struct AppOverview {
     pub(crate) tagline: &'static str,
     pub(crate) supported_platforms: [&'static str; 3],
     pub(crate) focus_areas: [&'static str; 3],
-    pub(crate) active_formats: [&'static str; 8],
+    pub(crate) active_formats: [&'static str; 12],
     pub(crate) planned_formats: [&'static str; 1],
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ArchiveCapabilities {
-    pub(crate) rar_extraction_available: bool,
-    pub(crate) rar_extractor_label: Option<String>,
+    pub(crate) native_archive_only: bool,
+    pub(crate) unsupported_formats: [&'static str; 1],
 }
 
 #[derive(Deserialize)]
@@ -133,10 +133,12 @@ pub(crate) enum ArchiveFormat {
     Zip,
     Tar,
     TarGz,
+    TarBz2,
     TarXz,
+    Xz,
+    Bz2,
     Gz,
     SevenZip,
-    Rar,
 }
 
 impl ArchiveFormat {
@@ -145,7 +147,10 @@ impl ArchiveFormat {
             "zip" => Ok(Self::Zip),
             "tar" => Ok(Self::Tar),
             "tar.gz" | "tgz" => Ok(Self::TarGz),
+            "tar.bz2" | "tbz2" => Ok(Self::TarBz2),
             "tar.xz" | "txz" => Ok(Self::TarXz),
+            "xz" => Ok(Self::Xz),
+            "bz2" => Ok(Self::Bz2),
             "gz" => Ok(Self::Gz),
             "7z" => Ok(Self::SevenZip),
             other => Err(format!("unsupported archive format: {other}")),
@@ -161,6 +166,10 @@ impl ArchiveFormat {
 
         if lower_name.ends_with(".tar.gz") || lower_name.ends_with(".tgz") {
             return Ok(Self::TarGz);
+        }
+
+        if lower_name.ends_with(".tar.bz2") || lower_name.ends_with(".tbz2") {
+            return Ok(Self::TarBz2);
         }
 
         if lower_name.ends_with(".tar.xz") || lower_name.ends_with(".txz") {
@@ -179,15 +188,19 @@ impl ArchiveFormat {
             return Ok(Self::SevenZip);
         }
 
-        if lower_name.ends_with(".rar") {
-            return Ok(Self::Rar);
+        if lower_name.ends_with(".xz") {
+            return Ok(Self::Xz);
+        }
+
+        if lower_name.ends_with(".bz2") {
+            return Ok(Self::Bz2);
         }
 
         if lower_name.ends_with(".gz") {
             return Ok(Self::Gz);
         }
 
-        Err("unsupported archive extension. Ziply currently supports zip, tar, tar.gz, tgz, gz, 7z, and optional rar extraction.".to_string())
+        Err("unsupported archive extension. Ziply currently supports zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, and 7z.".to_string())
     }
 
     pub(crate) fn label(self) -> &'static str {
@@ -195,10 +208,12 @@ impl ArchiveFormat {
             Self::Zip => "zip",
             Self::Tar => "tar",
             Self::TarGz => "tar.gz",
+            Self::TarBz2 => "tar.bz2",
             Self::TarXz => "tar.xz",
+            Self::Xz => "xz",
+            Self::Bz2 => "bz2",
             Self::Gz => "gz",
             Self::SevenZip => "7z",
-            Self::Rar => "rar",
         }
     }
 
@@ -207,10 +222,12 @@ impl ArchiveFormat {
             Self::Zip => ".zip",
             Self::Tar => ".tar",
             Self::TarGz => ".tar.gz",
+            Self::TarBz2 => ".tar.bz2",
             Self::TarXz => ".tar.xz",
+            Self::Xz => ".xz",
+            Self::Bz2 => ".bz2",
             Self::Gz => ".gz",
             Self::SevenZip => ".7z",
-            Self::Rar => ".rar",
         }
     }
 }
