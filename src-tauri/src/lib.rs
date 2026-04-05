@@ -32,7 +32,8 @@ pub fn run() {
             shell_commands::get_archive_history,
             shell_commands::clear_archive_history,
             archive_commands::compress_archive,
-            archive_commands::extract_archive
+            archive_commands::extract_archive,
+            archive_commands::preview_archive_contents
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Ziply");
@@ -61,7 +62,7 @@ mod tests {
     use super::archive::{
         create_7z_archive, create_gz_archive, create_tar_gz_archive, create_tar_xz_archive,
         create_zip_archive, extract_7z_archive, extract_gz_archive, extract_tar_gz_archive,
-        extract_tar_xz_archive, extract_zip_archive, prepare_extract_destination,
+        extract_tar_xz_archive, extract_zip_archive, prepare_extract_destination, preview_archive,
         resolve_archive_output_path,
     };
     use super::models::ConflictPolicy;
@@ -101,7 +102,7 @@ mod tests {
         create_zip_archive(&[source_directory.clone()], &archive_path).expect("create zip archive");
 
         let extract_directory = workspace.join("extract");
-        extract_zip_archive(&archive_path, &extract_directory).expect("extract zip archive");
+        extract_zip_archive(&archive_path, &extract_directory, None).expect("extract zip archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("source/docs/readme.txt"))
@@ -185,10 +186,11 @@ mod tests {
         write_file(&nested_file, "7z content");
 
         let archive_path = workspace.join("bundle.7z");
-        create_7z_archive(&[source_directory.clone()], &archive_path).expect("create 7z archive");
+        create_7z_archive(&[source_directory.clone()], &archive_path, None)
+            .expect("create 7z archive");
 
         let extract_directory = workspace.join("extract");
-        extract_7z_archive(&archive_path, &extract_directory).expect("extract 7z archive");
+        extract_7z_archive(&archive_path, &extract_directory, None).expect("extract 7z archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("reports/q1.txt"))
@@ -236,5 +238,75 @@ mod tests {
         assert_eq!(resolved, workspace.join("extract (1)"));
         assert!(resolved.is_dir());
         assert!(!resolved.join("old.txt").exists());
+    }
+
+    #[test]
+    fn zip_preview_lists_nested_entries() {
+        let workspace = unique_temp_dir("zip-preview");
+        let source_directory = workspace.join("source");
+        write_file(&source_directory.join("docs/readme.txt"), "preview content");
+        write_file(&source_directory.join("notes.txt"), "top level");
+
+        let archive_path = workspace.join("bundle.zip");
+        create_zip_archive(&[source_directory.clone()], &archive_path).expect("create zip archive");
+
+        let preview = preview_archive(&archive_path, 20, None).expect("preview zip archive");
+
+        assert_eq!(preview.format, "zip");
+        assert!(preview.total_entries >= 2);
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("source/docs/readme.txt")));
+    }
+
+    #[test]
+    fn seven_zip_preview_lists_entries() {
+        let workspace = unique_temp_dir("seven-zip-preview");
+        let source_directory = workspace.join("source");
+        write_file(&source_directory.join("reports/q1.txt"), "preview content");
+
+        let archive_path = workspace.join("bundle.7z");
+        create_7z_archive(&[source_directory], &archive_path, None).expect("create 7z archive");
+
+        let preview = preview_archive(&archive_path, 20, None).expect("preview 7z archive");
+
+        assert_eq!(preview.format, "7z");
+        assert!(preview.total_entries >= 1);
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("reports/q1.txt")));
+    }
+
+    #[test]
+    fn seven_zip_encrypted_round_trip_requires_password() {
+        let workspace = unique_temp_dir("seven-zip-encrypted-roundtrip");
+        let source_directory = workspace.join("source");
+        let nested_file = source_directory.join("secure/plan.txt");
+        write_file(&nested_file, "encrypted 7z content");
+
+        let archive_path = workspace.join("secure.7z");
+        create_7z_archive(&[source_directory], &archive_path, Some("ziply-secret"))
+            .expect("create encrypted 7z archive");
+
+        assert!(preview_archive(&archive_path, 20, None).is_err());
+
+        let preview =
+            preview_archive(&archive_path, 20, Some("ziply-secret")).expect("preview 7z archive");
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("secure/plan.txt")));
+
+        let extract_directory = workspace.join("extract");
+        extract_7z_archive(&archive_path, &extract_directory, Some("ziply-secret"))
+            .expect("extract encrypted 7z archive");
+
+        assert_eq!(
+            fs::read_to_string(extract_directory.join("secure/plan.txt"))
+                .expect("read extracted encrypted 7z file"),
+            "encrypted 7z content"
+        );
     }
 }

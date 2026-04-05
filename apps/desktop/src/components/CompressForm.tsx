@@ -10,14 +10,18 @@ interface CompressFormProps {
   compressDestination: string
   compressFormat: CompressFormat
   compressConflictPolicy: ConflictPolicy
+  compressPassword: string
   normalizedCompressSources: string[]
   gzipSourceCount: number
   feedback: ActionFeedback
+  supportsPasswordOnCompress: (format: CompressFormat) => boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
+  onQueue: () => void
   onCompressSourcesChange: (value: string) => void
   onCompressDestinationChange: (value: string) => void
   onCompressFormatChange: (value: CompressFormat) => void
   onCompressConflictPolicyChange: (value: ConflictPolicy) => void
+  onCompressPasswordChange: (value: string) => void
   onPickCompressFiles: () => void
   onPickCompressFolders: () => void
   onPickCompressDestination: () => void
@@ -29,14 +33,18 @@ export function CompressForm({
   compressDestination,
   compressFormat,
   compressConflictPolicy,
+  compressPassword,
   normalizedCompressSources,
   gzipSourceCount,
   feedback,
+  supportsPasswordOnCompress,
   onSubmit,
+  onQueue,
   onCompressSourcesChange,
   onCompressDestinationChange,
   onCompressFormatChange,
   onCompressConflictPolicyChange,
+  onCompressPasswordChange,
   onPickCompressFiles,
   onPickCompressFolders,
   onPickCompressDestination,
@@ -147,6 +155,24 @@ export function CompressForm({
         </small>
       </label>
 
+      <label className="field">
+        <span>Archive password</span>
+        <input
+          className="text-input"
+          onChange={(event) => {
+            onCompressPasswordChange(event.target.value)
+          }}
+          placeholder="Optional password"
+          type="password"
+          value={compressPassword}
+        />
+        <small>
+          {supportsPasswordOnCompress(compressFormat)
+            ? '7z archives can be encrypted with AES-256 when a password is set.'
+            : 'Password-protected archive creation is currently available for 7z only.'}
+        </small>
+      </label>
+
       {compressFormat === 'gz' ? (
         <p className={`inline-note ${gzipSourceCount === 1 ? '' : 'inline-note--warning'}`}>
           `gz` currently works with exactly one file and does not accept directories.
@@ -154,9 +180,23 @@ export function CompressForm({
       ) : null}
 
       <div className="tool-card__footer">
-        <button className="primary-button" disabled={feedback.status === 'running'} type="submit">
-          {feedback.status === 'running' ? 'Compressing...' : 'Create archive'}
-        </button>
+        <div className="button-row">
+          <button
+            className="primary-button"
+            disabled={feedback.status === 'running'}
+            type="submit"
+          >
+            {feedback.status === 'running' ? 'Compressing...' : 'Create archive'}
+          </button>
+          <button
+            className="ghost-button"
+            disabled={!desktopShell}
+            onClick={onQueue}
+            type="button"
+          >
+            Add to queue
+          </button>
+        </div>
         <ActionBanner feedback={feedback} />
       </div>
     </form>

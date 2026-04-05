@@ -9,6 +9,7 @@ import {
 import type { ShellIntent } from '../app/types'
 import { isDesktopShell, loadBootstrapData } from '../app/utils'
 import { useArchiveActions } from './useArchiveActions'
+import { useArchiveQueue } from './useArchiveQueue'
 import { useArchiveHistory } from './useArchiveHistory'
 import { useDesktopDragDrop } from './useDesktopDragDrop'
 import { useLiveJobs } from './useLiveJobs'
@@ -33,20 +34,31 @@ export function useZiplyRuntime() {
     compressDestination,
     compressFormat,
     compressConflictPolicy,
+    compressPassword,
     compressFeedback,
     extractSource,
     extractDestination,
     extractConflictPolicy,
+    extractPassword,
     extractFeedback,
+    extractPreview,
+    extractPreviewStatus,
+    extractPreviewError,
     normalizedCompressSources,
     gzipSourceCount,
+    setCompressFeedback,
     setCompressSources,
     setCompressDestination,
     setCompressFormat,
     setCompressConflictPolicy,
+    setCompressPassword,
     setExtractSource,
     setExtractDestination,
     setExtractConflictPolicy,
+    setExtractFeedback,
+    setExtractPassword,
+    buildCompressRequest,
+    buildExtractRequest,
     handleShellIntent,
     handleDroppedPaths,
     pickCompressFiles,
@@ -54,11 +66,27 @@ export function useZiplyRuntime() {
     pickCompressDestination,
     pickExtractSource,
     pickExtractDestination,
+    runCompressRequest,
+    runExtractRequest,
     runCompress,
     runExtract,
+    supportsArchivePasswordOnCompress,
+    supportsArchivePasswordOnExtract,
   } = useArchiveActions({
     desktopShell,
     refreshHistory,
+  })
+  const {
+    queueItems,
+    activeQueueJobId,
+    enqueueCompressJob,
+    enqueueExtractJob,
+    removeQueuedJob,
+    clearFinishedQueue,
+  } = useArchiveQueue({
+    desktopShell,
+    runCompressRequest,
+    runExtractRequest,
   })
   const handleShellIntentEvent = useEffectEvent(async (intent: ShellIntent) => {
     await handleShellIntent(intent)
@@ -134,22 +162,80 @@ export function useZiplyRuntime() {
     }
   }, [desktopShell])
 
+  function queueCurrentCompress() {
+    if (!desktopShell) {
+      startTransition(() => {
+        setCompressFeedback({
+          status: 'error',
+          message: 'Archive operations run inside the Tauri desktop shell.',
+        })
+      })
+      return
+    }
+
+    const request = buildCompressRequest()
+    const queuePosition = enqueueCompressJob(request)
+
+    startTransition(() => {
+      setCompressFeedback({
+        status: 'success',
+        message:
+          activeQueueJobId == null && queuePosition === 1
+            ? 'Job added to the batch queue. It will start immediately.'
+            : `Job added to the batch queue in position ${queuePosition}.`,
+        outputPath: request.destinationPath,
+      })
+    })
+  }
+
+  function queueCurrentExtract() {
+    if (!desktopShell) {
+      startTransition(() => {
+        setExtractFeedback({
+          status: 'error',
+          message: 'Archive operations run inside the Tauri desktop shell.',
+        })
+      })
+      return
+    }
+
+    const request = buildExtractRequest()
+    const queuePosition = enqueueExtractJob(request)
+
+    startTransition(() => {
+      setExtractFeedback({
+        status: 'success',
+        message:
+          activeQueueJobId == null && queuePosition === 1
+            ? 'Job added to the batch queue. It will start immediately.'
+            : `Job added to the batch queue in position ${queuePosition}.`,
+        outputPath: request.destinationDirectory,
+      })
+    })
+  }
+
   return {
     overview,
     capabilities,
     history,
     liveJobs,
+    queueItems,
     shellIntegration,
     runtimeStatus,
     compressSources,
     compressDestination,
     compressFormat,
     compressConflictPolicy,
+    compressPassword,
     compressFeedback,
     extractSource,
     extractDestination,
     extractConflictPolicy,
+    extractPassword,
     extractFeedback,
+    extractPreview,
+    extractPreviewStatus,
+    extractPreviewError,
     shellIntegrationFeedback,
     dragDropState,
     desktopShell,
@@ -159,12 +245,15 @@ export function useZiplyRuntime() {
     setCompressDestination,
     setCompressFormat,
     setCompressConflictPolicy,
+    setCompressPassword,
     setExtractSource,
     setExtractDestination,
     setExtractConflictPolicy,
+    setExtractPassword,
     refreshHistory,
     refreshShellIntegration,
     clearHistory,
+    clearFinishedQueue,
     installShellIntegration,
     pickCompressFiles,
     pickCompressFolders,
@@ -173,5 +262,10 @@ export function useZiplyRuntime() {
     pickExtractDestination,
     runCompress,
     runExtract,
+    queueCurrentCompress,
+    queueCurrentExtract,
+    removeQueuedJob,
+    supportsArchivePasswordOnCompress,
+    supportsArchivePasswordOnExtract,
   }
 }

@@ -28,6 +28,8 @@ pub(crate) struct CompressRequest {
     pub(crate) format: String,
     #[serde(default)]
     pub(crate) conflict_policy: Option<String>,
+    #[serde(default)]
+    pub(crate) password: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -37,6 +39,16 @@ pub(crate) struct ExtractRequest {
     pub(crate) destination_directory: String,
     #[serde(default)]
     pub(crate) conflict_policy: Option<String>,
+    #[serde(default)]
+    pub(crate) password: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ArchivePreviewRequest {
+    pub(crate) archive_path: String,
+    #[serde(default)]
+    pub(crate) password: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -46,6 +58,24 @@ pub(crate) struct ArchiveActionResult {
     pub(crate) format: &'static str,
     pub(crate) output_path: String,
     pub(crate) message: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ArchivePreviewEntry {
+    pub(crate) path: String,
+    pub(crate) kind: &'static str,
+    pub(crate) size: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ArchivePreviewResult {
+    pub(crate) format: &'static str,
+    pub(crate) total_entries: usize,
+    pub(crate) visible_entries: Vec<ArchivePreviewEntry>,
+    pub(crate) hidden_entry_count: usize,
+    pub(crate) note: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

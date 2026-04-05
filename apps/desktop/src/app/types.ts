@@ -60,6 +60,7 @@ export interface ShellIntegrationStatus {
 export type CompressFormat = 'zip' | 'tar' | 'tar.gz' | 'tar.xz' | 'gz' | '7z'
 export type ConflictPolicy = 'keepBoth' | 'overwrite' | 'stop'
 export type ActionStatus = 'idle' | 'running' | 'success' | 'error'
+export type QueueJobStatus = 'queued' | 'running' | 'success' | 'error'
 
 export interface ActionFeedback {
   status: ActionStatus
@@ -73,15 +74,62 @@ export interface DragDropState {
   message: string
 }
 
+export interface ArchivePreviewEntry {
+  path: string
+  kind: 'file' | 'directory'
+  size?: number | null
+}
+
+export interface ArchivePreviewResult {
+  format: string
+  totalEntries: number
+  visibleEntries: ArchivePreviewEntry[]
+  hiddenEntryCount: number
+  note?: string | null
+}
+
 export interface CompressArchiveRequest {
   sourcePaths: string[]
   destinationPath: string
   format: CompressFormat
   conflictPolicy: ConflictPolicy
+  password?: string
 }
 
 export interface ExtractArchiveRequest {
   archivePath: string
   destinationDirectory: string
   conflictPolicy: ConflictPolicy
+  password?: string
 }
+
+export interface ArchivePreviewRequest {
+  archivePath: string
+  password?: string
+}
+
+interface BaseQueueItem {
+  id: string
+  status: QueueJobStatus
+  operation: 'compress' | 'extract'
+  format: string
+  sourceSummary: string
+  outputPath: string
+  message: string
+  passwordProtected: boolean
+  createdAt: number
+  startedAt?: number
+  finishedAt?: number
+}
+
+export interface CompressQueueItem extends BaseQueueItem {
+  operation: 'compress'
+  request: CompressArchiveRequest
+}
+
+export interface ExtractQueueItem extends BaseQueueItem {
+  operation: 'extract'
+  request: ExtractArchiveRequest
+}
+
+export type ArchiveQueueItem = CompressQueueItem | ExtractQueueItem

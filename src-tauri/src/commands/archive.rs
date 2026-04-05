@@ -8,16 +8,17 @@ use crate::{
         create_tar_xz_archive, create_zip_archive, extract_7z_archive, extract_gz_archive,
         extract_rar_archive, extract_tar_archive, extract_tar_gz_archive, extract_tar_xz_archive,
         extract_zip_archive, normalize_archive_path, normalize_destination_path,
-        normalize_directory_path, normalize_source_paths, path_to_string,
-        prepare_extract_destination, resolve_archive_output_path,
+        normalize_directory_path, normalize_password, normalize_source_paths, path_to_string,
+        prepare_extract_destination, preview_archive, resolve_archive_output_path,
     },
     history::{
         append_archive_history, archive_history_id, archive_job_id, emit_archive_job_event,
         summarize_paths, unix_timestamp_ms,
     },
     models::{
-        ArchiveActionResult, ArchiveFormat, ArchiveHistoryEntry, ArchiveJobEvent, CompressRequest,
-        ConflictPolicy, ExtractRequest,
+        ArchiveActionResult, ArchiveFormat, ArchiveHistoryEntry, ArchiveJobEvent,
+        ArchivePreviewRequest, ArchivePreviewResult, CompressRequest, ConflictPolicy,
+        ExtractRequest,
     },
 };
 
@@ -29,6 +30,7 @@ pub(crate) fn compress_archive(
     let format = ArchiveFormat::from_compress_input(&request.format)?;
     let source_paths = normalize_source_paths(&request.source_paths)?;
     let conflict_policy = ConflictPolicy::from_input(request.conflict_policy.as_deref())?;
+    let password = normalize_password(request.password.as_deref());
     let destination_path = resolve_archive_output_path(
         &normalize_destination_path(&request.destination_path, format)?,
         conflict_policy,
@@ -61,6 +63,12 @@ pub(crate) fn compress_archive(
                 "gz compression only works with a single file, not a directory.".to_string(),
             );
         }
+    }
+
+    if password.is_some() && !matches!(format, ArchiveFormat::SevenZip) {
+        return Err(
+            "password-protected archive creation is currently supported for 7z only.".to_string(),
+        );
     }
 
     if let Some(parent) = destination_path.parent() {
@@ -112,7 +120,9 @@ pub(crate) fn compress_archive(
                 ArchiveFormat::TarGz => create_tar_gz_archive(&source_paths, &destination_path)?,
                 ArchiveFormat::TarXz => create_tar_xz_archive(&source_paths, &destination_path)?,
                 ArchiveFormat::Gz => create_gz_archive(&source_paths[0], &destination_path)?,
-                ArchiveFormat::SevenZip => create_7z_archive(&source_paths, &destination_path)?,
+                ArchiveFormat::SevenZip => {
+                    create_7z_archive(&source_paths, &destination_path, password.as_deref())?
+                }
                 ArchiveFormat::Rar => return Err(
                     "rar compression is not supported. Use zip, tar, tar.gz, gz, or 7z instead."
                         .to_string(),
@@ -208,6 +218,7 @@ pub(crate) fn extract_archive(
 ) -> Result<ArchiveActionResult, String> {
     let archive_path = normalize_archive_path(&request.archive_path)?;
     let conflict_policy = ConflictPolicy::from_input(request.conflict_policy.as_deref())?;
+    let password = normalize_password(request.password.as_deref());
     let destination_directory = prepare_extract_destination(
         &normalize_directory_path(&request.destination_directory)?,
         conflict_policy,
@@ -215,6 +226,13 @@ pub(crate) fn extract_archive(
     let format = ArchiveFormat::detect_from_archive_path(&archive_path)?;
     let job_id = archive_job_id();
     let source_summary = path_to_string(&archive_path);
+
+    if password.is_some() && !matches!(format, ArchiveFormat::Zip | ArchiveFormat::SevenZip) {
+        return Err(
+            "password-based extraction is currently supported for zip and 7z archives only."
+                .to_string(),
+        );
+    }
 
     emit_archive_job_event(
         &app,
@@ -266,12 +284,16 @@ pub(crate) fn extract_archive(
         );
 
         match format {
-            ArchiveFormat::Zip => extract_zip_archive(&archive_path, &destination_directory)?,
+            ArchiveFormat::Zip => {
+                extract_zip_archive(&archive_path, &destination_directory, password.as_deref())?
+            }
             ArchiveFormat::Tar => extract_tar_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::TarGz => extract_tar_gz_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::TarXz => extract_tar_xz_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::Gz => extract_gz_archive(&archive_path, &destination_directory)?,
-            ArchiveFormat::SevenZip => extract_7z_archive(&archive_path, &destination_directory)?,
+            ArchiveFormat::SevenZip => {
+                extract_7z_archive(&archive_path, &destination_directory, password.as_deref())?
+            }
             ArchiveFormat::Rar => extract_rar_archive(&archive_path, &destination_directory)?,
         }
 
@@ -355,4 +377,12 @@ pub(crate) fn extract_archive(
             Err(error)
         }
     }
+}
+
+#[tauri::command]
+pub(crate) fn preview_archive_contents(
+    request: ArchivePreviewRequest,
+) -> Result<ArchivePreviewResult, String> {
+    let archive_path = normalize_archive_path(&request.archive_path)?;
+    preview_archive(&archive_path, 160, request.password.as_deref())
 }

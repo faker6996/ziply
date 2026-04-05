@@ -8,13 +8,16 @@ use std::{
 };
 
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use sevenz_rust2::{decompress_file, ArchiveWriter};
+use sevenz_rust2::{
+    decompress_file, decompress_file_with_password, encoder_options::AesEncoderOptions,
+    ArchiveReader, ArchiveWriter, EncoderMethod, Password,
+};
 use tar::Builder as TarBuilder;
 use walkdir::WalkDir;
 use xz2::{read::XzDecoder, write::XzEncoder};
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
-use crate::models::{ArchiveFormat, ConflictPolicy};
+use crate::models::{ArchiveFormat, ArchivePreviewEntry, ArchivePreviewResult, ConflictPolicy};
 
 pub(crate) fn normalize_source_paths(source_paths: &[String]) -> Result<Vec<PathBuf>, String> {
     let normalized: Vec<PathBuf> = source_paths
@@ -98,6 +101,12 @@ pub(crate) fn normalize_directory_path(directory: &str) -> Result<PathBuf, Strin
     }
 
     Ok(PathBuf::from(trimmed))
+}
+
+pub(crate) fn normalize_password(password: Option<&str>) -> Option<String> {
+    password
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 pub(crate) fn resolve_archive_output_path(
@@ -382,9 +391,17 @@ pub(crate) fn create_gz_archive(source_path: &Path, destination_path: &Path) -> 
 pub(crate) fn create_7z_archive(
     source_paths: &[PathBuf],
     destination_path: &Path,
+    password: Option<&str>,
 ) -> Result<(), String> {
     let mut writer = ArchiveWriter::create(destination_path)
         .map_err(|error| format!("failed to create 7z archive writer: {error}"))?;
+
+    if let Some(password) = normalize_password(password) {
+        writer.set_content_methods(vec![
+            AesEncoderOptions::new(Password::new(&password)).into(),
+            EncoderMethod::LZMA2.into(),
+        ]);
+    }
 
     for source_path in source_paths {
         writer
@@ -406,16 +423,26 @@ pub(crate) fn create_7z_archive(
 pub(crate) fn extract_zip_archive(
     archive_path: &Path,
     destination_directory: &Path,
+    password: Option<&str>,
 ) -> Result<(), String> {
     let file = File::open(archive_path)
         .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
     let mut archive =
         ZipArchive::new(file).map_err(|error| format!("failed to read zip archive: {error}"))?;
+    let normalized_password = normalize_password(password);
 
     for index in 0..archive.len() {
-        let mut entry = archive
-            .by_index(index)
-            .map_err(|error| format!("failed to read zip entry: {error}"))?;
+        let mut entry = if let Some(password) = normalized_password.as_deref() {
+            match archive.by_index_decrypt(index, password.as_bytes()) {
+                Ok(Ok(entry)) => entry,
+                Ok(Err(_)) => return Err("invalid password for zip archive.".to_string()),
+                Err(error) => return Err(format!("failed to read zip entry: {error}")),
+            }
+        } else {
+            archive
+                .by_index(index)
+                .map_err(|error| format!("failed to read zip entry: {error}"))?
+        };
         let relative_path = entry
             .enclosed_name()
             .ok_or_else(|| format!("zip entry contains an unsafe path: {}", entry.name()))?;
@@ -562,9 +589,19 @@ pub(crate) fn extract_gz_archive(
 pub(crate) fn extract_7z_archive(
     archive_path: &Path,
     destination_directory: &Path,
+    password: Option<&str>,
 ) -> Result<(), String> {
-    decompress_file(archive_path, destination_directory)
+    if let Some(password) = normalize_password(password) {
+        decompress_file_with_password(
+            archive_path,
+            destination_directory,
+            Password::new(&password),
+        )
         .map_err(|error| format!("failed to extract 7z archive: {error}"))
+    } else {
+        decompress_file(archive_path, destination_directory)
+            .map_err(|error| format!("failed to extract 7z archive: {error}"))
+    }
 }
 
 pub(crate) fn extract_rar_archive(
@@ -577,6 +614,34 @@ pub(crate) fn extract_rar_archive(
     })?;
 
     run_external_rar_extract(&extractor, archive_path, destination_directory)
+}
+
+pub(crate) fn preview_archive(
+    archive_path: &Path,
+    limit: usize,
+    password: Option<&str>,
+) -> Result<ArchivePreviewResult, String> {
+    let format = ArchiveFormat::detect_from_archive_path(archive_path)?;
+    let visible_limit = limit.max(1);
+
+    match format {
+        ArchiveFormat::Zip => preview_zip_archive(archive_path, visible_limit),
+        ArchiveFormat::Tar => preview_tar_archive(archive_path, visible_limit),
+        ArchiveFormat::TarGz => preview_tar_gz_archive(archive_path, visible_limit),
+        ArchiveFormat::TarXz => preview_tar_xz_archive(archive_path, visible_limit),
+        ArchiveFormat::Gz => preview_gz_archive(archive_path),
+        ArchiveFormat::SevenZip => preview_7z_archive(archive_path, visible_limit, password),
+        ArchiveFormat::Rar => Ok(ArchivePreviewResult {
+            format: format.label(),
+            total_entries: 0,
+            visible_entries: Vec::new(),
+            hidden_entry_count: 0,
+            note: Some(
+                "Preview is not available for rar yet. You can still extract it if a rar backend is installed."
+                    .to_string(),
+            ),
+        }),
+    }
 }
 
 pub(crate) fn rar_extractor_label() -> Option<String> {
@@ -663,6 +728,177 @@ fn run_external_rar_extract(
             "{} failed while extracting the rar archive: {detail}",
             extractor.label()
         )
+    })
+}
+
+fn preview_zip_archive(archive_path: &Path, limit: usize) -> Result<ArchivePreviewResult, String> {
+    let file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| format!("failed to read zip archive: {error}"))?;
+    let total_entries = archive.len();
+    let mut visible_entries = Vec::with_capacity(total_entries.min(limit));
+
+    for index in 0..total_entries.min(limit) {
+        let entry = archive
+            .by_index(index)
+            .map_err(|error| format!("failed to read zip entry: {error}"))?;
+        visible_entries.push(ArchivePreviewEntry {
+            path: entry.name().to_string(),
+            kind: if entry.is_dir() { "directory" } else { "file" },
+            size: if entry.is_dir() {
+                None
+            } else {
+                Some(entry.size())
+            },
+        });
+    }
+
+    Ok(ArchivePreviewResult {
+        format: "zip",
+        total_entries,
+        hidden_entry_count: total_entries.saturating_sub(visible_entries.len()),
+        visible_entries,
+        note: None,
+    })
+}
+
+fn preview_tar_archive(archive_path: &Path, limit: usize) -> Result<ArchivePreviewResult, String> {
+    let file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let reader = BufReader::new(file);
+    let archive = tar::Archive::new(reader);
+    collect_tar_preview(archive, "tar", limit)
+}
+
+fn preview_tar_gz_archive(
+    archive_path: &Path,
+    limit: usize,
+) -> Result<ArchivePreviewResult, String> {
+    let file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let decoder = GzDecoder::new(BufReader::new(file));
+    let archive = tar::Archive::new(decoder);
+    collect_tar_preview(archive, "tar.gz", limit)
+}
+
+fn preview_tar_xz_archive(
+    archive_path: &Path,
+    limit: usize,
+) -> Result<ArchivePreviewResult, String> {
+    let file = File::open(archive_path)
+        .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
+    let decoder = XzDecoder::new(BufReader::new(file));
+    let archive = tar::Archive::new(decoder);
+    collect_tar_preview(archive, "tar.xz", limit)
+}
+
+fn collect_tar_preview<R: Read>(
+    mut archive: tar::Archive<R>,
+    format: &'static str,
+    limit: usize,
+) -> Result<ArchivePreviewResult, String> {
+    let entries = archive
+        .entries()
+        .map_err(|error| format!("failed to read tar archive entries: {error}"))?;
+    let mut total_entries = 0usize;
+    let mut visible_entries = Vec::new();
+
+    for entry in entries {
+        let entry =
+            entry.map_err(|error| format!("failed to inspect tar archive entry: {error}"))?;
+        let path = entry
+            .path()
+            .map_err(|error| format!("failed to read tar archive entry path: {error}"))?
+            .to_string_lossy()
+            .into_owned();
+        let header = entry.header();
+        let is_directory = header.entry_type().is_dir();
+
+        total_entries += 1;
+        if visible_entries.len() < limit {
+            visible_entries.push(ArchivePreviewEntry {
+                path,
+                kind: if is_directory { "directory" } else { "file" },
+                size: if is_directory {
+                    None
+                } else {
+                    Some(header.size().unwrap_or(0))
+                },
+            });
+        }
+    }
+
+    Ok(ArchivePreviewResult {
+        format,
+        total_entries,
+        hidden_entry_count: total_entries.saturating_sub(visible_entries.len()),
+        visible_entries,
+        note: None,
+    })
+}
+
+fn preview_gz_archive(archive_path: &Path) -> Result<ArchivePreviewResult, String> {
+    let output_name = archive_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .and_then(|value| value.strip_suffix(".gz"))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "gz archive name must end with .gz".to_string())?;
+
+    Ok(ArchivePreviewResult {
+        format: "gz",
+        total_entries: 1,
+        hidden_entry_count: 0,
+        visible_entries: vec![ArchivePreviewEntry {
+            path: output_name.to_string(),
+            kind: "file",
+            size: None,
+        }],
+        note: Some(
+            "Gzip archives usually contain a single file stream without folder structure."
+                .to_string(),
+        ),
+    })
+}
+
+fn preview_7z_archive(
+    archive_path: &Path,
+    limit: usize,
+    password: Option<&str>,
+) -> Result<ArchivePreviewResult, String> {
+    let password = normalize_password(password)
+        .map(|password| Password::new(&password))
+        .unwrap_or_else(Password::empty);
+    let reader = ArchiveReader::open(archive_path, password)
+        .map_err(|error| format!("failed to read 7z archive: {error}"))?;
+    let total_entries = reader.archive().files.len();
+    let visible_entries = reader
+        .archive()
+        .files
+        .iter()
+        .take(limit)
+        .map(|entry| ArchivePreviewEntry {
+            path: entry.name.clone(),
+            kind: if entry.is_directory {
+                "directory"
+            } else {
+                "file"
+            },
+            size: if entry.is_directory {
+                None
+            } else {
+                Some(entry.size)
+            },
+        })
+        .collect::<Vec<_>>();
+
+    Ok(ArchivePreviewResult {
+        format: "7z",
+        total_entries,
+        hidden_entry_count: total_entries.saturating_sub(visible_entries.len()),
+        visible_entries,
+        note: None,
     })
 }
 

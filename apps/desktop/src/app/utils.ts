@@ -4,6 +4,8 @@ import type {
   ArchiveCapabilities,
   ArchiveHistoryEntry,
   ArchiveJobEvent,
+  ArchivePreviewEntry,
+  ArchiveQueueItem,
   CompressFormat,
   ShellIntent,
   ShellIntegrationStatus,
@@ -71,7 +73,7 @@ export function formatLiveJobStatus(status: ArchiveJobEvent['status']) {
   return 'Failed'
 }
 
-export function liveJobStatusChipClass(status: ArchiveJobEvent['status']) {
+export function liveJobStatusChipClass(status: ArchiveJobEvent['status'] | ArchiveQueueItem['status']) {
   if (status === 'success') {
     return 'chip chip--success'
   }
@@ -87,7 +89,7 @@ export function liveJobStatusChipClass(status: ArchiveJobEvent['status']) {
   return 'chip chip--soft'
 }
 
-export function liveJobProgressClass(status: ArchiveJobEvent['status']) {
+export function liveJobProgressClass(status: ArchiveJobEvent['status'] | ArchiveQueueItem['status']) {
   if (status === 'success') {
     return 'progress-fill progress-fill--success'
   }
@@ -167,4 +169,78 @@ export function suggestExtractDestination(archivePath: string, extractHere: bool
 
 export function isArchivePath(path: string) {
   return /\.(tar\.gz|tar\.xz|tgz|txz|zip|tar|gz|7z|rar)$/i.test(path.trim())
+}
+
+export function supportsArchivePasswordOnCompress(format: CompressFormat) {
+  return format === '7z'
+}
+
+export function supportsArchivePasswordOnExtract(path: string) {
+  return /\.(zip|7z)$/i.test(path.trim())
+}
+
+function pathSegments(path: string) {
+  return path.trim().split(/[\\/]/).filter(Boolean)
+}
+
+export function fileNameFromPath(path: string) {
+  const segments = pathSegments(path)
+  return segments[segments.length - 1] ?? path.trim()
+}
+
+export function summarizePathList(paths: string[]) {
+  if (paths.length === 0) {
+    return 'No sources'
+  }
+
+  if (paths.length === 1) {
+    return fileNameFromPath(paths[0])
+  }
+
+  return `${paths.length} items`
+}
+
+export function inferArchiveFormatFromPath(path: string) {
+  const normalized = path.trim().toLowerCase()
+
+  if (normalized.endsWith('.tar.gz') || normalized.endsWith('.tgz')) {
+    return 'tar.gz'
+  }
+
+  if (normalized.endsWith('.tar.xz') || normalized.endsWith('.txz')) {
+    return 'tar.xz'
+  }
+
+  const match = normalized.match(/\.(zip|tar|gz|7z|rar)$/)
+  return match?.[1] ?? 'archive'
+}
+
+export function formatEntrySize(size?: number | null) {
+  if (size == null) {
+    return ''
+  }
+
+  if (size < 1024) {
+    return `${size} B`
+  }
+
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = size / 1024
+  let unitIndex = 0
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`
+}
+
+export function archivePreviewSummary(entry: ArchivePreviewEntry) {
+  if (entry.kind === 'directory') {
+    return 'Folder'
+  }
+
+  const sizeLabel = formatEntrySize(entry.size)
+  return sizeLabel ? `File • ${sizeLabel}` : 'File'
 }

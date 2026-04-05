@@ -20,4 +20,4 @@ tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 walkdir = "2"
 xz2 = "0.1"
-zip = { version = "0.6.6", default-features = false, features = ["deflate"] }
+zip = { version = "0.6.6", default-features = false, features = ["deflate", "aes-crypto"] }

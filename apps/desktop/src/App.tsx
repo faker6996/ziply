@@ -1,3 +1,4 @@
+import { BatchQueuePanel } from './components/BatchQueuePanel'
 import { CompressForm } from './components/CompressForm'
 import { DropZonePanel } from './components/DropZonePanel'
 import { ExtractForm } from './components/ExtractForm'
@@ -13,17 +14,23 @@ function App() {
     capabilities,
     history,
     liveJobs,
+    queueItems,
     shellIntegration,
     runtimeStatus,
     compressSources,
     compressDestination,
     compressFormat,
     compressConflictPolicy,
+    compressPassword,
     compressFeedback,
     extractSource,
     extractDestination,
     extractConflictPolicy,
+    extractPassword,
     extractFeedback,
+    extractPreview,
+    extractPreviewStatus,
+    extractPreviewError,
     shellIntegrationFeedback,
     dragDropState,
     desktopShell,
@@ -33,12 +40,15 @@ function App() {
     setCompressDestination,
     setCompressFormat,
     setCompressConflictPolicy,
+    setCompressPassword,
     setExtractSource,
     setExtractDestination,
     setExtractConflictPolicy,
+    setExtractPassword,
     refreshHistory,
     refreshShellIntegration,
     clearHistory,
+    clearFinishedQueue,
     installShellIntegration,
     pickCompressFiles,
     pickCompressFolders,
@@ -47,6 +57,11 @@ function App() {
     pickExtractDestination,
     runCompress,
     runExtract,
+    queueCurrentCompress,
+    queueCurrentExtract,
+    removeQueuedJob,
+    supportsArchivePasswordOnCompress,
+    supportsArchivePasswordOnExtract,
   } = useZiplyRuntime()
 
   return (
@@ -82,6 +97,7 @@ function App() {
           compressDestination={compressDestination}
           compressFormat={compressFormat}
           compressConflictPolicy={compressConflictPolicy}
+          compressPassword={compressPassword}
           compressSources={compressSources}
           desktopShell={desktopShell}
           feedback={compressFeedback}
@@ -90,6 +106,7 @@ function App() {
           onCompressDestinationChange={setCompressDestination}
           onCompressFormatChange={setCompressFormat}
           onCompressConflictPolicyChange={setCompressConflictPolicy}
+          onCompressPasswordChange={setCompressPassword}
           onCompressSourcesChange={setCompressSources}
           onPickCompressDestination={() => {
             void pickCompressDestination()
@@ -100,6 +117,8 @@ function App() {
           onPickCompressFolders={() => {
             void pickCompressFolders()
           }}
+          supportsPasswordOnCompress={supportsArchivePasswordOnCompress}
+          onQueue={queueCurrentCompress}
           onSubmit={runCompress}
         />
 
@@ -108,9 +127,14 @@ function App() {
           desktopShell={desktopShell}
           extractDestination={extractDestination}
           extractConflictPolicy={extractConflictPolicy}
+          extractPassword={extractPassword}
           extractSource={extractSource}
           feedback={extractFeedback}
+          preview={extractPreview}
+          previewError={extractPreviewError}
+          previewStatus={extractPreviewStatus}
           onExtractConflictPolicyChange={setExtractConflictPolicy}
+          onExtractPasswordChange={setExtractPassword}
           onExtractDestinationChange={setExtractDestination}
           onExtractSourceChange={setExtractSource}
           onPickExtractDestination={() => {
@@ -119,6 +143,8 @@ function App() {
           onPickExtractSource={() => {
             void pickExtractSource()
           }}
+          supportsPasswordOnExtract={supportsArchivePasswordOnExtract}
+          onQueue={queueCurrentExtract}
           onSubmit={runExtract}
         />
       </section>
@@ -139,6 +165,14 @@ function App() {
         />
 
         <LiveJobsPanel liveJobs={liveJobs} />
+
+        <BatchQueuePanel
+          onClearFinished={() => {
+            void clearFinishedQueue()
+          }}
+          onRemoveQueuedJob={removeQueuedJob}
+          queueItems={queueItems}
+        />
 
         <RecentOperationsPanel
           desktopShell={desktopShell}

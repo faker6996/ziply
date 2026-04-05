@@ -1,10 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
-import { startTransition, useState, type FormEvent } from 'react'
+import { startTransition, useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import { emptyFeedback } from '../app/defaults'
 import type {
   ActionFeedback,
   ArchiveActionResult,
+  ArchivePreviewRequest,
+  ArchivePreviewResult,
   CompressArchiveRequest,
   CompressFormat,
   ConflictPolicy,
@@ -17,6 +19,8 @@ import {
   isArchivePath,
   suggestArchiveName,
   suggestExtractDestination,
+  supportsArchivePasswordOnCompress,
+  supportsArchivePasswordOnExtract,
   toDialogPaths,
 } from '../app/utils'
 
@@ -33,103 +37,203 @@ export function useArchiveActions({
   const [compressDestination, setCompressDestination] = useState('')
   const [compressFormat, setCompressFormat] = useState<CompressFormat>('zip')
   const [compressConflictPolicy, setCompressConflictPolicy] = useState<ConflictPolicy>('keepBoth')
+  const [compressPassword, setCompressPassword] = useState('')
   const [compressFeedback, setCompressFeedback] = useState<ActionFeedback>(emptyFeedback)
   const [extractSource, setExtractSource] = useState('')
   const [extractDestination, setExtractDestination] = useState('')
   const [extractConflictPolicy, setExtractConflictPolicy] = useState<ConflictPolicy>('keepBoth')
+  const [extractPassword, setExtractPassword] = useState('')
   const [extractFeedback, setExtractFeedback] = useState<ActionFeedback>(emptyFeedback)
+  const [extractPreview, setExtractPreview] = useState<ArchivePreviewResult | null>(null)
+  const [extractPreviewStatus, setExtractPreviewStatus] =
+    useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [extractPreviewError, setExtractPreviewError] = useState('')
 
   const normalizedCompressSources = normalizePaths(compressSources)
   const gzipSourceCount = compressFormat === 'gz' ? normalizedCompressSources.length : 0
-
-  async function executeExtract(archivePath: string, destinationDirectory: string) {
+  const loadArchivePreview = useEffectEvent(async (archivePath: string) => {
     if (!desktopShell) {
-      setExtractFeedback({
-        status: 'error',
-        message: 'Archive operations run inside the Tauri desktop shell.',
+      startTransition(() => {
+        setExtractPreview(null)
+        setExtractPreviewStatus('idle')
+        setExtractPreviewError('')
       })
       return
     }
 
-    setExtractFeedback({
-      status: 'running',
-      message: 'Extracting archive...',
+    const nextPath = archivePath.trim()
+    if (!nextPath || !isArchivePath(nextPath)) {
+      startTransition(() => {
+        setExtractPreview(null)
+        setExtractPreviewStatus('idle')
+        setExtractPreviewError('')
       })
+      return
+    }
+
+    startTransition(() => {
+      setExtractPreviewStatus('loading')
+      setExtractPreviewError('')
+    })
 
     try {
-      const request: ExtractArchiveRequest = {
-        archivePath,
-        destinationDirectory,
-        conflictPolicy: extractConflictPolicy,
+      const request: ArchivePreviewRequest = {
+        archivePath: nextPath,
       }
+      if (extractPassword) {
+        request.password = extractPassword
+      }
+      const result = await invoke<ArchivePreviewResult>('preview_archive_contents', {
+        request,
+      })
+      startTransition(() => {
+        setExtractPreview(result)
+        setExtractPreviewStatus('ready')
+      })
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      startTransition(() => {
+        setExtractPreview(null)
+        setExtractPreviewStatus('error')
+        setExtractPreviewError(detail)
+      })
+    }
+  })
+
+  useEffect(() => {
+    void loadArchivePreview(extractSource)
+  }, [extractSource, extractPassword])
+
+  function buildCompressRequest(): CompressArchiveRequest {
+    const request: CompressArchiveRequest = {
+      sourcePaths: normalizedCompressSources,
+      destinationPath: compressDestination.trim(),
+      format: compressFormat,
+      conflictPolicy: compressConflictPolicy,
+    }
+
+    if (compressPassword.trim()) {
+      request.password = compressPassword.trim()
+    }
+
+    return request
+  }
+
+  function buildExtractRequest(): ExtractArchiveRequest {
+    const request: ExtractArchiveRequest = {
+      archivePath: extractSource.trim(),
+      destinationDirectory: extractDestination.trim(),
+      conflictPolicy: extractConflictPolicy,
+    }
+
+    if (extractPassword.trim()) {
+      request.password = extractPassword.trim()
+    }
+
+    return request
+  }
+
+  async function runExtractRequest(
+    request: ExtractArchiveRequest,
+    options?: { skipFeedback?: boolean },
+  ) {
+    if (!desktopShell) {
+      const detail = 'Archive operations run inside the Tauri desktop shell.'
+      if (!options?.skipFeedback) {
+        setExtractFeedback({
+          status: 'error',
+          message: detail,
+        })
+      }
+      throw new Error(detail)
+    }
+
+    if (!options?.skipFeedback) {
+      setExtractFeedback({
+        status: 'running',
+        message: 'Extracting archive...',
+      })
+    }
+
+    try {
       const result = await invoke<ArchiveActionResult>('extract_archive', {
         request,
       })
 
-      startTransition(() => {
-        setExtractFeedback({
-          status: 'success',
-          message: result.message,
-          outputPath: result.outputPath,
+      if (!options?.skipFeedback) {
+        startTransition(() => {
+          setExtractFeedback({
+            status: 'success',
+            message: result.message,
+            outputPath: result.outputPath,
+          })
         })
-      })
+      }
       void refreshHistory()
+      return result
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      startTransition(() => {
-        setExtractFeedback({
-          status: 'error',
-          message: detail,
+      if (!options?.skipFeedback) {
+        startTransition(() => {
+          setExtractFeedback({
+            status: 'error',
+            message: detail,
+          })
         })
-      })
+      }
+      throw error instanceof Error ? error : new Error(detail)
     }
   }
 
-  async function executeCompress(
-    sourcePaths: string[],
-    destinationPath: string,
-    format: CompressFormat,
+  async function runCompressRequest(
+    request: CompressArchiveRequest,
+    options?: { skipFeedback?: boolean },
   ) {
     if (!desktopShell) {
-      setCompressFeedback({
-        status: 'error',
-        message: 'Archive operations run inside the Tauri desktop shell.',
-      })
-      return
+      const detail = 'Archive operations run inside the Tauri desktop shell.'
+      if (!options?.skipFeedback) {
+        setCompressFeedback({
+          status: 'error',
+          message: detail,
+        })
+      }
+      throw new Error(detail)
     }
 
-    setCompressFeedback({
-      status: 'running',
-      message: 'Creating archive...',
-    })
+    if (!options?.skipFeedback) {
+      setCompressFeedback({
+        status: 'running',
+        message: 'Creating archive...',
+      })
+    }
 
     try {
-      const request: CompressArchiveRequest = {
-        sourcePaths,
-        destinationPath,
-        format,
-        conflictPolicy: compressConflictPolicy,
-      }
       const result = await invoke<ArchiveActionResult>('compress_archive', {
         request,
       })
 
-      startTransition(() => {
-        setCompressFeedback({
-          status: 'success',
-          message: result.message,
-          outputPath: result.outputPath,
+      if (!options?.skipFeedback) {
+        startTransition(() => {
+          setCompressFeedback({
+            status: 'success',
+            message: result.message,
+            outputPath: result.outputPath,
+          })
         })
-      })
+      }
       void refreshHistory()
+      return result
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      startTransition(() => {
-        setCompressFeedback({
-          status: 'error',
-          message: detail,
+      if (!options?.skipFeedback) {
+        startTransition(() => {
+          setCompressFeedback({
+            status: 'error',
+            message: detail,
+          })
         })
-      })
+      }
+      throw error instanceof Error ? error : new Error(detail)
     }
   }
 
@@ -167,7 +271,12 @@ export function useArchiveActions({
     })
 
     if (intent.autoRun) {
-      await executeExtract(archivePath, destinationDirectory)
+      await runExtractRequest({
+        archivePath,
+        destinationDirectory,
+        conflictPolicy: extractConflictPolicy,
+        ...(extractPassword.trim() ? { password: extractPassword.trim() } : {}),
+      })
     }
   }
 
@@ -287,12 +396,12 @@ export function useArchiveActions({
 
   async function runCompress(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await executeCompress(normalizedCompressSources, compressDestination.trim(), compressFormat)
+    await runCompressRequest(buildCompressRequest())
   }
 
   async function runExtract(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await executeExtract(extractSource.trim(), extractDestination.trim())
+    await runExtractRequest(buildExtractRequest())
   }
 
   return {
@@ -300,20 +409,31 @@ export function useArchiveActions({
     compressDestination,
     compressFormat,
     compressConflictPolicy,
+    compressPassword,
     compressFeedback,
     extractSource,
     extractDestination,
     extractConflictPolicy,
+    extractPassword,
     extractFeedback,
+    extractPreview,
+    extractPreviewStatus,
+    extractPreviewError,
     normalizedCompressSources,
     gzipSourceCount,
+    setCompressFeedback,
     setCompressSources,
     setCompressDestination,
     setCompressFormat,
     setCompressConflictPolicy,
+    setCompressPassword,
     setExtractSource,
     setExtractDestination,
     setExtractConflictPolicy,
+    setExtractFeedback,
+    setExtractPassword,
+    buildCompressRequest,
+    buildExtractRequest,
     handleShellIntent,
     handleDroppedPaths,
     pickCompressFiles,
@@ -321,7 +441,11 @@ export function useArchiveActions({
     pickCompressDestination,
     pickExtractSource,
     pickExtractDestination,
+    runCompressRequest,
+    runExtractRequest,
     runCompress,
     runExtract,
+    supportsArchivePasswordOnCompress,
+    supportsArchivePasswordOnExtract,
   }
 }
