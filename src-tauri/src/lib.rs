@@ -9,12 +9,17 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use crate::{
-    archive::{is_supported_archive_path, path_to_string},
     commands::{
         archive as archive_commands, metadata as metadata_commands, shell as shell_commands,
     },
     models::PendingShellIntents,
-    shell::{collect_launch_shell_intents, shell_extract_intent, store_shell_intents},
+    shell::{collect_launch_shell_intents, store_shell_intents},
+};
+
+#[cfg(target_os = "macos")]
+use crate::{
+    archive::{is_supported_archive_path, path_to_string},
+    shell::shell_extract_intent,
 };
 
 pub fn run() {
@@ -38,24 +43,30 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to build Ziply");
 
-    app.run(|app, event| {
-        if let tauri::RunEvent::Opened { urls } = event {
-            let intents = urls
-                .into_iter()
-                .filter_map(|url| url.to_file_path().ok())
-                .filter(|path| is_supported_archive_path(path))
-                .map(|path| shell_extract_intent(&path_to_string(&path), false))
-                .collect::<Vec<_>>();
-
-            let _ = store_shell_intents(app, intents);
-
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-        }
-    });
+    app.run(handle_run_event);
 }
+
+#[cfg(target_os = "macos")]
+fn handle_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
+    if let tauri::RunEvent::Opened { urls } = event {
+        let intents = urls
+            .into_iter()
+            .filter_map(|url| url.to_file_path().ok())
+            .filter(|path| is_supported_archive_path(path))
+            .map(|path| shell_extract_intent(&path_to_string(&path), false))
+            .collect::<Vec<_>>();
+
+        let _ = store_shell_intents(app, intents);
+
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn handle_run_event(_app: &tauri::AppHandle, _event: tauri::RunEvent) {}
 
 #[cfg(test)]
 mod tests {

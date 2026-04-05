@@ -3,8 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(target_os = "linux")]
+use std::fs;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use std::{fs, process::Command};
+use std::process::Command;
 
 use tauri::{AppHandle, Manager};
 

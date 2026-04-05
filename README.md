@@ -1,6 +1,6 @@
 # Ziply
 
-> A lightweight, fast, and intuitive cross-platform desktop application for compressing and extracting archives. Ship one app for macOS, Windows, and Linux.
+Ziply is a cross-platform desktop archive utility for macOS, Windows, and Linux. It focuses on fast compress and extract workflows, archive preview, selective extract, live job tracking, and release packaging from one Tauri + React codebase.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -8,56 +8,128 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/ci.yml?branch=main&label=ci)
 ![Installers](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/build-installers.yml?branch=main&label=installers)
 
-## ✨ Features
+## What Ziply Does Today
 
-- **🗜️ Multi-format Support**: Native support for ZIP, TAR, TAR.GZ, TAR.XZ, GZ, and 7Z
-- **📦 RAR Extraction**: Extract RAR files when compatible external tools are available
-- **⚡ Fast & Efficient**: Native Rust backend ensures high performance
-- **🖥️ Cross-platform**: Single codebase for macOS, Windows, and Linux
-- **📋 History & Persistence**: Track recent operations locally
-- **🔄 Live Status**: Real-time progress updates during archive operations
-- **🐚 Shell Integration**: Native file association and context menu support
-- **💾 Conflict Handling**: Smart overwrite rules and conflict prompts
+- Compress and extract archives from one desktop workspace
+- Support `zip`, `tar`, `tar.gz`, `tar.xz`, `gz`, and `7z` natively
+- Extract `rar` archives through compatible external tools when they exist on the machine
+- Preview archive contents before extraction
+- Search preview results and progressively load more entries
+- Extract everything or only selected entries for supported formats
+- Queue multiple jobs and retry failed jobs
+- Track live job state and persist recent operations locally
+- Handle destination conflicts with `keep both`, `overwrite`, or `stop`
+- Accept drag and drop for files, folders, and archives
+- Support password flows for encrypted `7z` creation and password-protected `zip` / `7z` extraction
 
-## 📋 Supported Archive Formats
+## Supported Formats
 
-| Format | Compress | Extract | Notes |
-| ------ | -------- | ------- | ----- |
-| ZIP    | ✅       | ✅      | Deflate compression. Password/AES support is extract-only right now |
-| TAR    | ✅       | ✅      | Pure TAR format |
-| TAR.GZ | ✅       | ✅      | Gzip compressed |
-| TAR.XZ | ✅       | ✅      | XZ compressed |
-| GZ     | ✅       | ✅      | Basic Gzip. Compression supports exactly one file |
-| 7Z     | ✅       | ✅      | Via sevenz-rust. Supports encrypted archive creation and extraction |
-| RAR    | ❌       | ✅      | Requires external tool such as `unar`, `7z`, `7zz`, or `unrar` |
+| Format | Compress | Extract | Preview | Selective Extract | Notes |
+| ------ | -------- | ------- | ------- | ----------------- | ----- |
+| ZIP | ✅ | ✅ | ✅ | ✅ | Deflate compression. Password and AES support are extract-only right now |
+| TAR | ✅ | ✅ | ✅ | ✅ | Pure TAR |
+| TAR.GZ | ✅ | ✅ | ✅ | ✅ | Gzip-compressed tar |
+| TAR.XZ | ✅ | ✅ | ✅ | ✅ | XZ-compressed tar |
+| GZ | ✅ | ✅ | ✅ | ❌ | Compression supports exactly one file |
+| 7Z | ✅ | ✅ | ✅ | ✅ | Powered by `sevenz-rust2`. Supports encrypted archive creation and extraction |
+| RAR | ❌ | ✅ | ❌ | ❌ | Requires `unar`, `7z`, `7zz`, or `unrar` on the host machine |
 
-## 🚀 Quick Start
+## Current Product Scope
 
-### Installation (From Source)
+### End-user features
+
+- `Compress` and `Extract` forms with native Tauri file and folder pickers
+- Archive preview with search and `Load more`
+- `Extract all`, `Extract selected`, `Queue all`, and `Queue selected`
+- Batch queue with sequential execution and retry for failed jobs
+- Recent operations history stored locally
+- Live job state panel driven by backend events
+- Drag-and-drop workspace that routes archives to extract and regular files or folders to compress
+- Shell-intent handling for open, extract, extract-here, and compress launch flows
+
+### Password support
+
+- Create encrypted `7z` archives
+- Extract password-protected `7z` archives
+- Extract password-protected `zip` archives, including AES-backed ZIPs
+
+### Conflict handling
+
+- `Keep both`
+- `Overwrite`
+- `Stop on conflict`
+
+For extraction, conflict handling currently applies at the destination level, not as a per-entry rename strategy inside the archive.
+
+## Platform Notes
+
+### Shell integration
+
+- Windows: Explorer context commands are implemented for extract, extract-here, and compress flows
+- Linux: desktop action integration is implemented for compatible launchers and file managers
+- macOS: file association and `Open With Ziply` are supported through the bundle; custom Finder right-click actions are not fully shipped yet
+
+### Packaging
+
+- macOS: DMG
+- Windows: NSIS installer
+- Linux: DEB package
+
+## Known Limits
+
+- Creating encrypted ZIP archives is not implemented yet
+- `rar` support depends on external tools and does not currently support preview or selective extract
+- `gz` preview is single-stream oriented and selective extract is not applicable
+- Batch jobs currently run one at a time
+- Finder-specific custom context-menu actions on macOS still need a dedicated extension or Quick Action path
+
+## Quick Start
+
+### Build From Source
+
+Requirements:
+
+- Node.js 22 or newer
+- npm
+- Rust stable
+- Platform build dependencies required by Tauri
+
+Clone and run:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/ziply.git
+git clone https://github.com/faker6996/ziply.git
 cd ziply
-
-# Install dependencies
 npm install
-
-# Run development build
 npm run dev
 ```
 
-### Build for Production
+### Useful Commands
 
 ```bash
+# Desktop dev
+npm run dev
+
+# Frontend-only dev server
+npm run dev:web
+
+# Web asset build
+npm run build:web
+
+# Desktop build
 npm run build
+
+# Frontend lint
+npm run lint
+
+# Rust tests
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-## 📥 Package Installation
+## Package Installation
 
 ### Homebrew
 
-After the Homebrew tap repository is configured, install Ziply with:
+Once the Homebrew tap release flow is configured and published:
 
 ```bash
 brew tap faker6996/tap
@@ -66,7 +138,7 @@ brew install --cask faker6996/tap/ziply
 
 ### APT
 
-After GitHub Pages and APT signing secrets are configured, install Ziply with:
+Once the APT repository and signing flow are configured and published:
 
 ```bash
 curl -fsSL https://faker6996.github.io/ziply/apt/ziply-archive-keyring.asc | sudo gpg --dearmor -o /usr/share/keyrings/ziply-archive-keyring.gpg
@@ -75,132 +147,82 @@ sudo apt update
 sudo apt install ziply
 ```
 
-## 🛠️ Development
+If release infrastructure is not configured yet, install from source instead.
 
-### Tech Stack
+## Development Stack
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Backend**: Rust + Tauri 2
-- **Archive Libraries**: zip, tar, flate2, xz2, sevenz-rust
-- **Dialogs**: Tauri native file/folder dialogs
+- Frontend: React 19, TypeScript, Vite
+- Desktop shell: Tauri 2
+- Backend language: Rust
+- Native dialogs: `@tauri-apps/plugin-dialog`
+- Archive libraries: `zip`, `tar`, `flate2`, `xz2`, `sevenz-rust2`
 
-### Project Structure
+## Repository Layout
 
-```
+```text
 ziply/
 ├── apps/
-│   └── desktop/           # React Vite frontend
-│       ├── src/
-│       │   ├── app/       # Main application logic
-│       │   ├── components/
-│       │   ├── hooks/
-│       │   └── styles/
-│       └── package.json
-├── src-tauri/             # Tauri Rust backend
-│   ├── src/
-│   │   ├── commands/      # Archive operations (compress/extract)
-│   │   ├── models.rs      # Data structures
-│   │   ├── shell.rs       # Shell integration
-│   │   ├── archive.rs     # Archive engine
-│   │   ├── history.rs     # Operation history
-│   │   └── main.rs
-│   └── Cargo.toml
-└── package.json           # Workspace manifest
+│   └── desktop/
+│       ├── src/app/          # shared app types, defaults, utilities
+│       ├── src/components/   # UI panels and forms
+│       ├── src/hooks/        # runtime, queue, history, shell, drag-drop hooks
+│       └── src/styles/       # split CSS layers
+├── src-tauri/
+│   ├── src/archive.rs        # archive engine
+│   ├── src/history.rs        # persisted operation history
+│   ├── src/models.rs         # request and response models
+│   ├── src/shell.rs          # OS shell integration helpers
+│   └── src/commands/         # Tauri command layer
+├── packaging/homebrew/       # Homebrew cask templates and tap skeleton
+├── scripts/                  # release and packaging helper scripts
+└── .github/workflows/        # CI and release automation
 ```
 
-### Available Commands
+## GitHub Actions
 
-```bash
-# Development
-npm run dev              # Start development server with Tauri
-npm run dev:web         # Start web server only (port 1420)
+Ziply ships with two workflows:
 
-# Production
-npm run build           # Build for all platforms
-npm run build:web       # Build web assets only
+- `ci.yml`
+  - Runs `npm run lint`
+  - Runs `npm run build:web`
+  - Runs `cargo fmt --all --check`
+  - Runs `cargo test --manifest-path src-tauri/Cargo.toml`
+  - Runs `cargo check --manifest-path src-tauri/Cargo.toml`
+- `build-installers.yml`
+  - Builds DMG, NSIS, and DEB installers
+  - Uploads installer artifacts
+  - Auto-tags the current app version from `main`
+  - Publishes a GitHub Release
+  - Updates the Homebrew tap when Homebrew credentials are configured
+  - Publishes the APT repository to GitHub Pages when APT signing secrets are configured
 
-# Code Quality
-npm run lint            # Run ESLint on frontend
-```
+### Release Configuration
 
-## 🤖 GitHub Actions
-
-Ziply includes two main workflows under `.github/workflows`:
-
-- `ci.yml`: Runs frontend lint, web build, Rust format check, Rust tests, and `cargo check`
-- `build-installers.yml`: Builds installers on macOS, Windows, and Linux, auto-tags the version from `main`, publishes the GitHub Release, updates the Homebrew tap, and deploys the APT repository to GitHub Pages when the required secrets are configured
-
-### Required Secrets And Variables
-
-For package feeds to publish automatically, configure:
+Repository secrets used by packaging:
 
 - `HOMEBREW_TAP_TOKEN`
 - `APT_GPG_PRIVATE_KEY`
 - `APT_GPG_PASSPHRASE`
-- repository variable `HOMEBREW_TAP_REPOSITORY`
-- repository variable `HOMEBREW_TAP_BRANCH`
 
-Without those values, the workflow still builds installers and publishes the GitHub release, but skips Homebrew and APT publication.
+Repository variables used by packaging:
 
-## 📊 Development Status
+- `HOMEBREW_TAP_REPOSITORY`
+- `HOMEBREW_TAP_BRANCH`
 
-### ✅ Completed
+GitHub Pages must also be enabled for the repository if you want the APT publish step to deploy.
 
-- Clean Tauri + React foundation
-- Native archive format support (ZIP, TAR, TAR.GZ, TAR.XZ, GZ, 7Z)
-- Basic RAR extraction with external tool bridge
-- Archive form UI for compress and extract workflows
-- Recent operations history (persisted locally)
-- Live job status tracking with backend events
-- Shell integration and file associations
-- Installer configurations for all three platforms
+If those values are missing, installer builds and the GitHub Release can still run, but feed publication steps are skipped.
 
-### 🔄 In Progress
+## Validation Status
 
-- Progress reporting for long-running jobs
-- Cross-platform shell integration polish
-- Finder-specific macOS integration improvements
+At the current state of the repository, the core local validation path is:
 
-### 🗓️ Planned
+```bash
+npm run lint
+npm run build:web
+cargo test --manifest-path src-tauri/Cargo.toml
+```
 
-- Password-protected archive support
-- Enhanced error classification and recovery guidance
-- Broader format coverage across platforms
-- Drag-and-drop interface improvements
-- Extended conflict handling scenarios
+## License
 
-## 📦 Dependencies
-
-### Frontend
-
-- `@tauri-apps/api` - Tauri API client
-- `@tauri-apps/plugin-dialog` - Native dialogs
-- `react` & `react-dom` - UI framework
-- `typescript` - Type safety
-
-### Backend
-
-- `tauri` - Desktop framework
-- `zip` - ZIP format handling
-- `tar` - TAR format handling
-- `flate2` - Gzip compression
-- `xz2` - XZ compression
-- `sevenz-rust2` - 7Z format handling
-- `walkdir` - Directory traversal
-- `serde` & `serde_json` - Serialization
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🎯 Next Steps
-
-For detailed implementation plans and milestones, see [PLAN.md](PLAN.md).
-
----
-
-Made with ❤️ for seamless file compression and extraction.
+MIT. See [LICENSE](/Users/tran_van_bach/Desktop/project/ziply/LICENSE).
