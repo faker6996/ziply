@@ -14,6 +14,7 @@ if (tauriArgs.length === 0) {
 
 const repoRoot = join(__dirname, "..");
 const tauriConfigPath = join(repoRoot, "src-tauri", "tauri.conf.json");
+const tauriCliEntrypoint = join(repoRoot, "node_modules", "@tauri-apps", "cli", "tauri.js");
 const cargoBinDirectory = join(homedir(), ".cargo", "bin");
 const envWithCargo = {
   ...process.env,
@@ -21,9 +22,9 @@ const envWithCargo = {
 };
 
 if (process.platform !== "win32") {
-  runNpmExecTauri(envWithCargo);
+  runTauriCli(envWithCargo);
 } else if (isWindowsBuildEnvironmentReady(envWithCargo)) {
-  runNpmExecTauri(envWithCargo);
+  runTauriCli(envWithCargo);
 } else {
   const vsDevCmd = resolveVsDevCmd();
 
@@ -38,11 +39,9 @@ if (process.platform !== "win32") {
   }
 
   const command = [
-      `call "${vsDevCmd}" -arch=x64 -host_arch=x64 >nul`,
-      `set "PATH=${cargoBinDirectory};%PATH%"`,
-      windowsNpmExecCommand(
-        `exec --workspace @ziply/desktop tauri -- ${toCmdArgsString(tauriArgs)} --config ${quoteForCmd(tauriConfigPath)}`,
-      ),
+    `call "${vsDevCmd}" -arch=x64 -host_arch=x64 >nul`,
+    `set "PATH=${cargoBinDirectory};%PATH%"`,
+    `${quoteForCmd(process.execPath)} ${quoteForCmd(tauriCliEntrypoint)} ${toCmdArgsString(tauriArgs)} --config ${quoteForCmd(tauriConfigPath)}`,
   ].join(" && ");
 
   const child = spawn("cmd.exe", ["/d", "/c", command], {
@@ -62,17 +61,11 @@ if (process.platform !== "win32") {
   });
 }
 
-function runNpmExecTauri(env) {
-  const invocation = npmExecInvocation();
+function runTauriCli(env) {
   const child = spawn(
-    invocation.command,
+    process.execPath,
     [
-      ...invocation.args,
-      "exec",
-      "--workspace",
-      "@ziply/desktop",
-      "tauri",
-      "--",
+      tauriCliEntrypoint,
       ...tauriArgs,
       "--config",
       tauriConfigPath,
@@ -93,25 +86,6 @@ function runNpmExecTauri(env) {
 
     process.exit(code ?? 1);
   });
-}
-
-function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
-}
-
-function npmExecInvocation() {
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && /\.c?js$/i.test(npmExecPath)) {
-    return {
-      command: process.execPath,
-      args: [npmExecPath],
-    };
-  }
-
-  return {
-    command: npmCommand(),
-    args: [],
-  };
 }
 
 function prependPathEntry(currentPath, entry) {
@@ -171,13 +145,4 @@ function quoteForCmd(value) {
   }
 
   return `"${value.replace(/"/g, '""')}"`;
-}
-
-function windowsNpmExecCommand(trailingArgs) {
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && /\.c?js$/i.test(npmExecPath)) {
-    return `${quoteForCmd(process.execPath)} ${quoteForCmd(npmExecPath)} ${trailingArgs}`;
-  }
-
-  return `npm ${trailingArgs}`;
 }
