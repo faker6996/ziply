@@ -1,0 +1,110 @@
+.app-shell {
+  width: min(1160px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero-card,
+.feature-card,
+.panel-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  background: rgba(7, 15, 24, 0.68);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(20px);
+}
+
+.hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 20px;
+  padding: 28px;
+}
+
+.hero-card::after,
+.feature-card::after,
+.panel-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 42%);
+}
+
+.grid,
+.detail-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.grid--tools,
+.detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.feature-card,
+.panel-card {
+  padding: 24px;
+}
+
+.feature-card h2,
+.panel-card h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.feature-card p,
+.panel-card p {
+  margin: 0;
+  color: rgba(245, 242, 234, 0.76);
+}
+
+.feature-card--compress {
+  background:
+    linear-gradient(160deg, rgba(247, 197, 106, 0.18), rgba(7, 15, 24, 0.72)),
+    rgba(7, 15, 24, 0.68);
+}
+
+.feature-card--extract {
+  background:
+    linear-gradient(160deg, rgba(86, 156, 255, 0.18), rgba(7, 15, 24, 0.72)),
+    rgba(7, 15, 24, 0.68);
+}
+
+.tool-card {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.tool-card__header,
+.tool-card__footer,
+.button-row,
+.input-action,
+.field-grid {
+  display: flex;
+  gap: 12px;
+}
+
+.tool-card__header,
+.tool-card__footer {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.field-grid {
+  align-items: flex-end;
+}
+
+.field-grid > * {
+  flex: 1 1 0;
+}
+
+.panel-card--wide {
+  grid-column: 1 / -1;
+}

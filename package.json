@@ -1,0 +1,15 @@
+{
+  "name": "ziply",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run tauri --workspace @ziply/desktop -- dev",
+    "dev:web": "npm run dev --workspace @ziply/desktop",
+    "build": "npm run tauri --workspace @ziply/desktop -- build",
+    "build:web": "npm run build --workspace @ziply/desktop",
+    "lint": "npm run lint --workspace @ziply/desktop"
+  }
+}

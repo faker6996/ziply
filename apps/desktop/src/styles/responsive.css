@@ -1,0 +1,31 @@
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100vw - 24px, 1160px);
+    padding: 20px 0 36px;
+  }
+
+  .hero-card,
+  .grid--tools,
+  .detail-grid,
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card,
+  .tool-card__header,
+  .tool-card__footer,
+  .history-header,
+  .button-row,
+  .input-action,
+  .field-grid {
+    display: grid;
+  }
+
+  .hero-card {
+    padding: 22px;
+  }
+
+  .primary-button {
+    width: 100%;
+  }
+}

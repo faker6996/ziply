@@ -1,0 +1,94 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Ziply",
+  "version": "0.1.0",
+  "identifier": "com.tranvanbach.ziply",
+  "build": {
+    "beforeDevCommand": "npm run dev --workspace @ziply/desktop",
+    "beforeBuildCommand": "npm run build --workspace @ziply/desktop",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../apps/desktop/dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Ziply",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 980,
+        "minHeight": 720,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "Tran Van Bach",
+    "homepage": "https://github.com/faker6996/ziply",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
+    "copyright": "Copyright (c) 2026 Tran Van Bach",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "category": "Utility",
+    "fileAssociations": [
+      {
+        "ext": ["zip"],
+        "name": "ZIP Archive",
+        "description": "Ziply ZIP archive",
+        "mimeType": "application/zip",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["7z"],
+        "name": "7z Archive",
+        "description": "Ziply 7z archive",
+        "mimeType": "application/x-7z-compressed",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["rar"],
+        "name": "RAR Archive",
+        "description": "Ziply RAR archive",
+        "mimeType": "application/vnd.rar",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["tar"],
+        "name": "TAR Archive",
+        "description": "Ziply TAR archive",
+        "mimeType": "application/x-tar",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["tgz", "gz"],
+        "name": "GZip Archive",
+        "description": "Ziply GZip archive",
+        "mimeType": "application/gzip",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["txz", "xz"],
+        "name": "XZ Archive",
+        "description": "Ziply XZ archive",
+        "mimeType": "application/x-xz",
+        "role": "Viewer"
+      }
+    ],
+    "shortDescription": "Archive utility for compressing and extracting files and folders.",
+    "longDescription": "Ziply is a desktop archive utility for macOS, Windows, and Linux focused on compressing and extracting files and folders from one clean workspace."
+  }
+}

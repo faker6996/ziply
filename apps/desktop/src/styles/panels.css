@@ -1,0 +1,168 @@
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(247, 197, 106, 0.14);
+  color: #fce3ae;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.chip--soft {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 242, 234, 0.88);
+}
+
+.chip--muted {
+  background: rgba(123, 141, 255, 0.16);
+  color: #dfe5ff;
+}
+
+.chip--warm {
+  background: rgba(247, 197, 106, 0.18);
+  color: #fff1cb;
+}
+
+.chip--success {
+  background: rgba(69, 212, 131, 0.16);
+  color: #d9ffe9;
+}
+
+.chip--danger {
+  background: rgba(255, 139, 113, 0.16);
+  color: #ffe0d7;
+}
+
+.support-note {
+  display: grid;
+  gap: 8px;
+}
+
+.support-note strong {
+  color: #fff4d4;
+}
+
+.support-note p {
+  color: rgba(245, 242, 234, 0.72);
+}
+
+.history-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.history-empty,
+.jobs-empty {
+  color: rgba(245, 242, 234, 0.62);
+}
+
+.jobs-list,
+.history-list,
+.focus-list {
+  display: grid;
+  gap: 12px;
+}
+
+.job-card,
+.history-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.history-item {
+  gap: 8px;
+}
+
+.job-card strong,
+.job-card p,
+.history-item strong,
+.history-item p {
+  overflow-wrap: anywhere;
+}
+
+.history-item strong {
+  color: #fff4d4;
+}
+
+.history-item p {
+  color: rgba(245, 242, 234, 0.68);
+}
+
+.job-card__header,
+.job-card__meta,
+.history-item__meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.job-card__header {
+  justify-content: space-between;
+}
+
+.job-card__meta {
+  justify-content: flex-start;
+}
+
+.history-item__meta {
+  gap: 8px;
+}
+
+.progress-track {
+  overflow: hidden;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #f7c56a, #ff9b55);
+  transition: width 180ms ease;
+}
+
+.progress-fill--success {
+  background: linear-gradient(135deg, #5bdd94, #3fcf7d);
+}
+
+.progress-fill--error {
+  background: linear-gradient(135deg, #ff9b83, #ff6f61);
+}
+
+.job-path,
+.history-time {
+  color: rgba(245, 242, 234, 0.56);
+}
+
+.history-time {
+  font-size: 0.88rem;
+}
+
+.focus-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.focus-index {
+  width: 12px;
+  height: 12px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f7c56a, #ff8b71);
+}
