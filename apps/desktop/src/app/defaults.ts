@@ -19,8 +19,8 @@ export const fallbackOverview: AppOverview = {
     'Extract common archive formats',
     'Keep one workflow across three desktop operating systems',
   ],
-  activeFormats: ['zip', 'tar', 'tar.gz', 'tgz', 'tar.bz2', 'tbz2', 'tar.xz', 'txz', 'xz', 'bz2', 'gz', '7z'],
-  plannedFormats: ['rar'],
+  activeFormats: ['zip', 'tar', 'tar.gz', 'tgz', 'tar.bz2', 'tbz2', 'tar.xz', 'txz', 'xz', 'bz2', 'gz', '7z', 'rar'],
+  plannedFormats: [],
 }
 
 export const emptyFeedback: ActionFeedback = {
@@ -30,7 +30,7 @@ export const emptyFeedback: ActionFeedback = {
 
 export const fallbackCapabilities: ArchiveCapabilities = {
   nativeArchiveOnly: true,
-  unsupportedFormats: ['rar'],
+  unsupportedFormats: [],
 }
 
 export const fallbackHistory: ArchiveHistoryEntry[] = []

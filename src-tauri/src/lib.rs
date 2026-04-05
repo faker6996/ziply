@@ -3,6 +3,8 @@ mod commands;
 mod history;
 mod models;
 mod shell;
+#[cfg(test)]
+mod test_fixtures;
 
 use std::sync::Mutex;
 
@@ -73,11 +75,13 @@ mod tests {
     use super::archive::{
         create_7z_archive, create_bz2_archive, create_gz_archive, create_tar_bz2_archive,
         create_tar_gz_archive, create_tar_xz_archive, create_xz_archive, create_zip_archive,
-        extract_7z_archive, extract_bz2_archive, extract_gz_archive, extract_tar_bz2_archive,
-        extract_tar_gz_archive, extract_tar_xz_archive, extract_xz_archive, extract_zip_archive,
+        extract_7z_archive, extract_bz2_archive, extract_gz_archive, extract_rar_archive,
+        extract_tar_bz2_archive, extract_tar_gz_archive, extract_tar_xz_archive,
+        extract_xz_archive, extract_zip_archive, normalize_archive_path,
         prepare_extract_destination, preview_archive, resolve_archive_output_path,
     };
     use super::models::ConflictPolicy;
+    use super::test_fixtures::{RAR4_SAVE_TXT, RAR5_SAVE_TXT, TEXT_TXT};
     use std::{
         fs,
         fs::File,
@@ -120,10 +124,30 @@ mod tests {
             .join(name)
     }
 
+    fn rar_fixture_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures/rar")
+            .join(name)
+    }
+
     fn compatibility_raw_payload() -> Vec<u8> {
         (0..(65_536 + 19))
             .map(|index| ((index * 29 + 7) % 251) as u8)
             .collect()
+    }
+
+    fn write_bytes(path: &Path, contents: &[u8]) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent directory");
+        }
+        fs::write(path, contents).expect("write bytes");
+    }
+
+    fn write_rar_fixture(label: &str, file_name: &str, bytes: &[u8]) -> PathBuf {
+        let workspace = unique_temp_dir(label);
+        let archive_path = workspace.join(file_name);
+        write_bytes(&archive_path, bytes);
+        archive_path
     }
 
     #[test]
@@ -725,6 +749,197 @@ mod tests {
                 .expect("read extracted encrypted 7z file"),
             "Ziply compatibility fixture\n"
         );
+    }
+
+    #[test]
+    fn rar_fixture_extracts_contents_natively() {
+        let archive_path = write_rar_fixture("rar5-extract-fixture", "fixture.rar", RAR5_SAVE_TXT);
+        let extract_directory = unique_temp_dir("rar-extract");
+
+        extract_rar_archive(&archive_path, &extract_directory, None, None)
+            .expect("extract rar archive");
+
+        let extracted = fs::read(extract_directory.join("text.txt")).expect("read extracted text");
+        assert_eq!(extracted, TEXT_TXT);
+    }
+
+    #[test]
+    fn rar4_fixture_is_rejected_cleanly() {
+        let archive_path = write_rar_fixture("rar4-extract-fixture", "fixture.rar", RAR4_SAVE_TXT);
+        let extract_directory = unique_temp_dir("rar4-extract");
+
+        let error = extract_rar_archive(&archive_path, &extract_directory, None, None)
+            .expect_err("rar4 fixture should currently fail");
+        assert!(error.contains("older rar4 variant"));
+    }
+
+    #[test]
+    fn rar4_preview_is_rejected_cleanly() {
+        let archive_path = write_rar_fixture("rar4-preview-fixture", "fixture.rar", RAR4_SAVE_TXT);
+        let error = match preview_archive(&archive_path, 20, None) {
+            Ok(_) => panic!("rar4 preview should fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("older rar4 variant"));
+    }
+
+    #[test]
+    fn rar_selective_extract_copies_selected_entries() {
+        let archive_path = write_rar_fixture("rar-selective-fixture", "fixture.rar", RAR5_SAVE_TXT);
+        let extract_directory = unique_temp_dir("rar-selective-extract");
+
+        extract_rar_archive(
+            &archive_path,
+            &extract_directory,
+            None,
+            Some(&["text.txt".to_string()]),
+        )
+        .expect("extract selected rar entry");
+
+        let extracted = fs::read(extract_directory.join("text.txt")).expect("read extracted text");
+        assert_eq!(extracted, TEXT_TXT);
+    }
+
+    #[test]
+    fn rar_preview_lists_fixture_entries() {
+        let archive_path = write_rar_fixture("rar-preview-fixture", "fixture.rar", RAR5_SAVE_TXT);
+        let preview = preview_archive(&archive_path, 20, None).expect("preview rar archive");
+        assert_eq!(preview.format, "rar");
+        assert_eq!(preview.total_entries, 1);
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("text.txt")));
+    }
+
+    #[test]
+    fn rar5_password_fixture_requires_password() {
+        let archive_path = rar_fixture_path("rar5-save-32mb-txt-png-pw-test.rar");
+        assert!(
+            archive_path.is_file(),
+            "missing fixture {}",
+            archive_path.display()
+        );
+
+        let preview = preview_archive(&archive_path, 20, Some("test")).expect("preview rar");
+        assert_eq!(preview.format, "rar");
+        assert_eq!(preview.total_entries, 2);
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("text.txt")));
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("photo.jpg")));
+
+        let missing_password_error = extract_rar_archive(
+            &archive_path,
+            &unique_temp_dir("rar-encrypted-no-password"),
+            None,
+            None,
+        )
+        .expect_err("encrypted rar should require password");
+        assert!(missing_password_error.contains("requires a password"));
+
+        let wrong_password_error = extract_rar_archive(
+            &archive_path,
+            &unique_temp_dir("rar-encrypted-wrong-password"),
+            Some("wrong-secret"),
+            None,
+        )
+        .expect_err("wrong rar password should fail");
+        assert!(wrong_password_error.contains("invalid password"));
+
+        let extract_directory = unique_temp_dir("rar-encrypted-extract");
+        extract_rar_archive(&archive_path, &extract_directory, Some("test"), None)
+            .expect("extract encrypted rar");
+
+        assert_eq!(
+            fs::read(extract_directory.join("text.txt")).expect("read extracted text"),
+            TEXT_TXT
+        );
+        assert_eq!(
+            fs::metadata(extract_directory.join("photo.jpg"))
+                .expect("stat extracted photo")
+                .len(),
+            2_149_083
+        );
+    }
+
+    #[test]
+    fn rar5_multipart_fixture_extracts_and_previews() {
+        let archive_path = rar_fixture_path("rar5-save-32mb-txt-png-512kb.part1.rar");
+        assert!(
+            archive_path.is_file(),
+            "missing fixture {}",
+            archive_path.display()
+        );
+
+        let preview = preview_archive(&archive_path, 20, None).expect("preview multipart rar");
+        assert_eq!(preview.format, "rar");
+        assert_eq!(preview.total_entries, 2);
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("text.txt")));
+        assert!(preview
+            .visible_entries
+            .iter()
+            .any(|entry| entry.path.ends_with("photo.jpg")));
+
+        let extract_directory = unique_temp_dir("rar-multipart-extract");
+        extract_rar_archive(&archive_path, &extract_directory, None, None)
+            .expect("extract multipart rar");
+
+        assert_eq!(
+            fs::read(extract_directory.join("text.txt")).expect("read extracted text"),
+            TEXT_TXT
+        );
+        assert_eq!(
+            fs::metadata(extract_directory.join("photo.jpg"))
+                .expect("stat extracted photo")
+                .len(),
+            2_149_083
+        );
+    }
+
+    #[test]
+    fn rar_multipart_non_first_volume_is_rejected_cleanly() {
+        let archive_path = rar_fixture_path("rar5-save-32mb-txt-png-512kb.part2.rar");
+        assert!(
+            archive_path.is_file(),
+            "missing fixture {}",
+            archive_path.display()
+        );
+
+        let error = extract_rar_archive(&archive_path, &unique_temp_dir("rar-part2"), None, None)
+            .expect_err("later multipart volume should fail");
+        assert!(error.contains("open the first rar volume"));
+    }
+
+    #[test]
+    fn normalize_archive_path_resolves_rar_part_volume_to_first_volume() {
+        let archive_path = rar_fixture_path("rar5-save-32mb-txt-png-512kb.part2.rar");
+        let resolved =
+            normalize_archive_path(&archive_path.to_string_lossy()).expect("normalize rar part");
+        assert_eq!(
+            resolved,
+            rar_fixture_path("rar5-save-32mb-txt-png-512kb.part1.rar")
+        );
+    }
+
+    #[test]
+    fn normalize_archive_path_resolves_old_style_rar_segment_to_main_volume() {
+        let workspace = unique_temp_dir("rar-old-style-normalize");
+        let main_volume = workspace.join("bundle.rar");
+        let segment = workspace.join("bundle.r00");
+        write_bytes(&main_volume, RAR5_SAVE_TXT);
+        write_bytes(&segment, RAR5_SAVE_TXT);
+
+        let resolved =
+            normalize_archive_path(&segment.to_string_lossy()).expect("normalize r00 segment");
+        assert_eq!(resolved, main_volume);
     }
 
     #[test]

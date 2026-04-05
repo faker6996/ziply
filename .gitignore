@@ -30,3 +30,5 @@ apps/desktop/coverage/
 
 src-tauri/gen/
 src-tauri/tests/
+src-tauri/testdata/
+src-tauri/fixtures/

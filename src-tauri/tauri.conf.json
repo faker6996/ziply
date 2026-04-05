@@ -60,6 +60,13 @@
         "role": "Viewer"
       },
       {
+        "ext": ["rar"],
+        "name": "RAR Archive",
+        "description": "Ziply RAR archive",
+        "mimeType": "application/vnd.rar",
+        "role": "Viewer"
+      },
+      {
         "ext": ["tar"],
         "name": "TAR Archive",
         "description": "Ziply TAR archive",

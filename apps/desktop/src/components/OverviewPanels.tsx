@@ -44,8 +44,8 @@ export function OverviewPanels({ overview, capabilities }: OverviewPanelsProps) 
     {
       format: 'rar',
       create: 'No',
-      extract: 'No',
-      notes: 'Not supported yet. Ziply only lists native archive formats in active support.',
+      extract: 'Yes',
+      notes: 'Native extract, preview, and selective extract support. Password-protected and multipart RAR5 archives are covered, and Ziply auto-resolves later volume entries back to the first archive part. Archive creation is not shipped because the current native stack is read-side only. Older RAR4 variants still need work.',
     },
   ]
 
@@ -75,13 +75,17 @@ export function OverviewPanels({ overview, capabilities }: OverviewPanelsProps) 
 
       <article className="panel-card">
         <p className="card-label">Planned later</p>
-        <ul className="chip-list">
-          {overview.plannedFormats.map((format) => (
-            <li className="chip chip--muted" key={format}>
-              {format}
-            </li>
-          ))}
-        </ul>
+        {overview.plannedFormats.length > 0 ? (
+          <ul className="chip-list">
+            {overview.plannedFormats.map((format) => (
+              <li className="chip chip--muted" key={format}>
+                {format}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="support-note">No extra format claims are queued right now.</p>
+        )}
       </article>
 
       <article className="panel-card">
@@ -89,9 +93,11 @@ export function OverviewPanels({ overview, capabilities }: OverviewPanelsProps) 
         <div className="support-note">
           <strong>Ziply is running native-only.</strong>
           <p>
-            All formats listed in Supported now are handled by Ziply itself. Unsupported formats:
+            All formats listed in Supported now are handled by Ziply itself.
             {' '}
-            {capabilities.unsupportedFormats.join(', ')}.
+            {capabilities.unsupportedFormats.length > 0
+              ? `Unsupported formats: ${capabilities.unsupportedFormats.join(', ')}.`
+              : 'No external archive helper apps are required for active support.'}
           </p>
         </div>
       </article>

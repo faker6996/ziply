@@ -152,7 +152,10 @@ export function suggestArchiveName(format: CompressFormat, sourcePaths: string[]
 }
 
 function stripArchiveExtension(path: string) {
-  return path.replace(/\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|bz2|gz|7z|xz)$/i, '')
+  return path.replace(
+    /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|bz2|gz|7z|xz|rar|part\d+\.rar|r\d\d)$/i,
+    '',
+  )
 }
 
 function parentDirectory(path: string) {
@@ -172,7 +175,7 @@ export function suggestExtractDestination(archivePath: string, extractHere: bool
 }
 
 export function isArchivePath(path: string) {
-  return /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|bz2|gz|7z|xz)$/i.test(path.trim())
+  return /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|bz2|gz|7z|xz|rar|part\d+\.rar|r\d\d)$/i.test(path.trim())
 }
 
 export function supportsArchivePasswordOnCompress(format: CompressFormat) {
@@ -180,11 +183,11 @@ export function supportsArchivePasswordOnCompress(format: CompressFormat) {
 }
 
 export function supportsArchivePasswordOnExtract(path: string) {
-  return /\.(zip|7z)$/i.test(path.trim())
+  return /\.(zip|7z|rar|part\d+\.rar|r\d\d)$/i.test(path.trim())
 }
 
 export function supportsSelectiveExtract(path: string) {
-  return /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|7z)$/i.test(path.trim())
+  return /\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|txz|zip|tar|7z|rar|part\d+\.rar|r\d\d)$/i.test(path.trim())
 }
 
 function pathSegments(path: string) {
@@ -223,7 +226,11 @@ export function inferArchiveFormatFromPath(path: string) {
     return 'tar.xz'
   }
 
-  const match = normalized.match(/\.(zip|tar|bz2|gz|7z|xz)$/)
+  if (normalized.match(/\.part\d+\.rar$/) || normalized.match(/\.r\d\d$/)) {
+    return 'rar'
+  }
+
+  const match = normalized.match(/\.(zip|tar|bz2|gz|7z|xz|rar)$/)
   return match?.[1] ?? 'archive'
 }
 
@@ -276,12 +283,16 @@ export function recoveryHintForArchiveError(message: string) {
     return 'Use zip or 7z when you need password protection. Choose 7z when you want the stronger encryption path already shipped in Ziply.'
   }
 
-  if (normalized.includes('password-based extraction is currently supported for zip and 7z archives only')) {
-    return 'Remove the password for this archive type, or use a zip or 7z archive if encrypted extraction is required.'
+  if (normalized.includes('password-based extraction is currently supported for zip, 7z, and rar archives only')) {
+    return 'Remove the password for this archive type, or use a zip, 7z, or rar archive if encrypted extraction is required.'
   }
 
-  if (normalized.includes('selective extraction is currently supported for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z archives only')) {
-    return 'Use full extraction for gz, bz2, and xz archives. Selective extraction is available for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z.'
+  if (normalized.includes('rar archive requires a password before extraction')) {
+    return 'Enter the correct RAR password, then run the job again. Ziply validates encrypted RAR output before writing it into the destination folder.'
+  }
+
+  if (normalized.includes('selective extraction is currently supported for zip, tar, tar.gz, tar.bz2, tar.xz, 7z, and rar archives only')) {
+    return 'Use full extraction for gz, bz2, and xz archives. Selective extraction is available for zip, tar, tar.gz, tar.bz2, tar.xz, 7z, and rar.'
   }
 
   if (normalized.includes('destination archive already exists')) {
@@ -297,7 +308,23 @@ export function recoveryHintForArchiveError(message: string) {
   }
 
   if (normalized.includes('unsupported archive extension') || normalized.includes('unsupported archive format')) {
-    return 'Use one of the supported formats: zip, tar, tar.gz, tar.bz2, tar.xz, xz, bz2, gz, or 7z.'
+    return 'Use one of the supported formats: zip, tar, tar.gz, tar.bz2, tar.xz, xz, bz2, gz, 7z, or rar extraction.'
+  }
+
+  if (normalized.includes('older rar4 variant')) {
+    return 'This RAR file uses an older RAR4 layout that Ziply does not extract reliably yet. Repack it as RAR5, ZIP, or 7z if you can.'
+  }
+
+  if (normalized.includes('multipart rar archives are not supported yet')) {
+    return 'This looks like part of a multi-volume RAR set. Merge or repack the archive into a single ZIP, 7z, or RAR5 file before extracting with Ziply.'
+  }
+
+  if (normalized.includes('open the first rar volume instead of') || normalized.includes('open the main .rar file instead of')) {
+    return 'Start extraction from the first volume in the set. For .part archives, choose part1.rar. For old-style volume chains, choose the main .rar file.'
+  }
+
+  if (normalized.includes('could not find every volume for this multipart rar archive')) {
+    return 'Keep every volume from the multipart RAR set in the same folder, then open the first part again.'
   }
 
   if (

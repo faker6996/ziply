@@ -7,7 +7,7 @@ use crate::{
         create_7z_archive, create_bz2_archive, create_gz_archive, create_tar_archive,
         create_tar_bz2_archive, create_tar_gz_archive, create_tar_xz_archive, create_xz_archive,
         create_zip_archive, extract_7z_archive, extract_bz2_archive, extract_gz_archive,
-        extract_tar_archive, extract_tar_bz2_archive, extract_tar_gz_archive,
+        extract_rar_archive, extract_tar_archive, extract_tar_bz2_archive, extract_tar_gz_archive,
         extract_tar_xz_archive, extract_xz_archive, extract_zip_archive, normalize_archive_path,
         normalize_destination_path, normalize_directory_path, normalize_password,
         normalize_source_paths, path_to_string, prepare_extract_destination, preview_archive,
@@ -137,6 +137,9 @@ pub(crate) fn compress_archive(
             ArchiveFormat::SevenZip => {
                 create_7z_archive(&source_paths, &destination_path, password.as_deref())?
             }
+            ArchiveFormat::Rar => {
+                return Err("rar archive creation is not available yet.".to_string());
+            }
         }
 
         emit_archive_job_event(
@@ -256,9 +259,14 @@ pub(crate) fn extract_archive(
         )
     };
 
-    if password.is_some() && !matches!(format, ArchiveFormat::Zip | ArchiveFormat::SevenZip) {
+    if password.is_some()
+        && !matches!(
+            format,
+            ArchiveFormat::Zip | ArchiveFormat::SevenZip | ArchiveFormat::Rar
+        )
+    {
         return Err(
-            "password-based extraction is currently supported for zip and 7z archives only."
+            "password-based extraction is currently supported for zip, 7z, and rar archives only."
                 .to_string(),
         );
     }
@@ -270,7 +278,7 @@ pub(crate) fn extract_archive(
         )
     {
         return Err(
-            "selective extraction is currently supported for zip, tar, tar.gz, tar.bz2, tar.xz, and 7z archives only."
+            "selective extraction is currently supported for zip, tar, tar.gz, tar.bz2, tar.xz, 7z, and rar archives only."
                 .to_string(),
         );
     }
@@ -355,6 +363,12 @@ pub(crate) fn extract_archive(
             ArchiveFormat::Bz2 => extract_bz2_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::Gz => extract_gz_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::SevenZip => extract_7z_archive(
+                &archive_path,
+                &destination_directory,
+                password.as_deref(),
+                Some(&selected_entries),
+            )?,
+            ArchiveFormat::Rar => extract_rar_archive(
                 &archive_path,
                 &destination_directory,
                 password.as_deref(),

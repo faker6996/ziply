@@ -11,7 +11,7 @@ use std::process::Command;
 use tauri::{AppHandle, Manager};
 
 use crate::{
-    archive::{is_supported_archive_path, path_to_string},
+    archive::{is_supported_archive_path, path_to_string, resolve_rar_archive_entry_path},
     history::emit_shell_intent,
     models::{PendingShellIntents, ShellIntegrationStatus, ShellIntent},
 };
@@ -66,14 +66,14 @@ pub(crate) fn collect_launch_shell_intents() -> Vec<ShellIntent> {
 }
 
 pub(crate) fn shell_extract_intent(path: &str, auto_run: bool) -> ShellIntent {
-    let archive_path = PathBuf::from(path);
+    let archive_path = resolve_rar_archive_entry_path(&PathBuf::from(path));
     ShellIntent {
         action: if auto_run {
             "extract-here".to_string()
         } else {
             "extract".to_string()
         },
-        paths: vec![path.to_string()],
+        paths: vec![path_to_string(&archive_path)],
         auto_run,
         destination_path: default_shell_extract_destination(&archive_path, auto_run)
             .map(|value| path_to_string(&value)),
@@ -117,7 +117,7 @@ fn archive_display_name(path: &Path) -> Option<String> {
     let lower = file_name.to_ascii_lowercase();
     let suffixes = [
         ".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".zip", ".tar", ".bz2", ".gz",
-        ".7z", ".xz",
+        ".7z", ".xz", ".rar",
     ];
 
     for suffix in suffixes {
@@ -128,6 +128,32 @@ fn archive_display_name(path: &Path) -> Option<String> {
             } else {
                 Some(trimmed.to_string())
             };
+        }
+    }
+
+    if let Some(start) = lower.find(".part") {
+        if let Some(number) = lower[start + 5..].strip_suffix(".rar") {
+            if !number.is_empty() && number.chars().all(|ch| ch.is_ascii_digit()) {
+                let trimmed = &file_name[..start];
+                return if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                };
+            }
+        }
+    }
+
+    if let Some(extension) = path.extension().and_then(|value| value.to_str()) {
+        let extension = extension.to_ascii_lowercase();
+        if extension.len() == 3
+            && extension.starts_with('r')
+            && extension[1..].chars().all(|ch| ch.is_ascii_digit())
+        {
+            return path
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .map(|value| value.to_string());
         }
     }
 
@@ -168,7 +194,7 @@ fn install_windows_shell_integration(executable: &Path) -> Result<(), String> {
     let compress_command = format!("\"{}\" --compress \"%1\"", executable.display());
     let archive_extensions = [
         ".zip", ".7z", ".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".gz", ".bz2", ".tgz", ".tbz2",
-        ".txz", ".xz",
+        ".txz", ".xz", ".rar",
     ];
 
     for extension in archive_extensions {

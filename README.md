@@ -21,7 +21,7 @@ If a format is not implemented natively inside this repository, it stays out of 
 ## What Ziply Does Today
 
 - Compress and extract archives from one desktop workspace
-- Support `zip`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, `xz`, `bz2`, `gz`, and `7z` natively
+- Support `zip`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, `xz`, `bz2`, `gz`, `7z`, and native `rar` extraction
 - Preview archive contents before extraction
 - Search preview results and progressively load more entries
 - Extract everything or only selected entries for supported formats
@@ -54,13 +54,11 @@ The rule is:
 | BZ2 | ✅ | ✅ | ✅ | ❌ | Compression supports exactly one file |
 | GZ | ✅ | ✅ | ✅ | ❌ | Compression supports exactly one file |
 | 7Z | ✅ | ✅ | ✅ | ✅ | Powered by `sevenz-rust2`. Supports encrypted archive creation and extraction |
-| RAR | ❌ | ❌ | ❌ | ❌ | Not supported yet |
+| RAR | ❌ | ✅ | ✅ | ✅ | Native extract, preview, and selective extract support. Password-protected and multipart RAR5 archives are covered, and Ziply auto-resolves later volume entries back to the first archive part. `RAR` creation is not shipped because the current native stack is read-side only. Older RAR4 variants still need work |
 
 ## Planned Native Formats
 
-These are not supported yet and should be treated as roadmap only:
-
-- `rar` if native implementation quality and licensing are acceptable
+No extra format claims are queued right now. Existing roadmap work is focused on hardening the native set already shipped.
 
 ## Current Product Scope
 
@@ -81,6 +79,9 @@ The current native archive test suite covers:
 
 - round-trip archive creation and extraction for the supported native formats
 - fixture-based compatibility checks for `zip`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, raw stream formats, and `7z` archives produced outside Ziply
+- self-contained RAR5 preview and extraction fixture coverage for the native `rar` path
+- tracked RAR5 password-protected and multipart fixture coverage for the native `rar` path
+- clean failure coverage for older RAR4 fixtures that the current native stack does not extract reliably yet
 - unicode filenames
 - empty files and empty directories
 - large binary payloads for raw stream formats
@@ -88,6 +89,10 @@ The current native archive test suite covers:
 - selective extract behavior
 - password success and wrong-password failure paths for `7z`
 - unsafe ZIP path rejection during extraction
+
+Compatibility fixtures are generated locally by script and are not committed to git:
+
+- `bash scripts/generate-compat-fixtures.sh`
 
 ### Password support
 
@@ -121,7 +126,11 @@ For extraction, conflict handling currently applies at the destination level, no
 ## Known Limits
 
 - ZIP creation supports password-protected output. Use `7z` when you want the stronger encryption option already shipped in Ziply
-- `rar` is not supported yet
+- `rar` currently ships as native extract, preview, and selective extract support
+- password-protected and multipart `rar5` archives are covered; broader `rar` variant coverage still needs work
+- selecting `.part2.rar` or `.r00` routes back to the first archive volume automatically when the matching first volume exists
+- older `rar4` archives are not broadly supported yet
+- `rar` archive creation is not shipped because the current native Rust stack in Ziply is read-side only
 - `gz`, `xz`, and `bz2` preview are single-stream oriented and selective extract is not applicable
 - Batch jobs currently run one at a time
 - Finder-specific custom context-menu actions on macOS still need a dedicated extension or Quick Action path
@@ -166,6 +175,9 @@ npm run lint
 
 # Rust tests
 cargo test --manifest-path src-tauri/Cargo.toml
+
+# Regenerate local compatibility fixtures
+bash scripts/generate-compat-fixtures.sh
 ```
 
 ## Package Installation
@@ -198,7 +210,7 @@ If release infrastructure is not configured yet, install from source instead.
 - Desktop shell: Tauri 2
 - Backend language: Rust
 - Native dialogs: `@tauri-apps/plugin-dialog`
-- Archive libraries: `zip`, `tar`, `flate2`, `bzip2`, `xz2`, `sevenz-rust2`
+- Archive libraries: `zip`, `tar`, `flate2`, `bzip2`, `xz2`, `sevenz-rust2`, `rar`
 
 ## Repository Layout
 
@@ -216,9 +228,9 @@ ziply/
 │   ├── src/models.rs         # request and response models
 │   ├── src/shell.rs          # OS shell integration helpers
 │   ├── src/commands/         # Tauri command layer
-│   └── tests/fixtures/compat # compatibility archives generated from system tools
+│   └── tests/fixtures/compat # generated local compatibility archives from system tools (gitignored)
 ├── packaging/homebrew/       # Homebrew cask templates and tap skeleton
-├── scripts/                  # release and packaging helper scripts, including fixture generation
+├── scripts/                  # release, version, and fixture-generation helper scripts
 └── .github/workflows/        # CI and release automation
 ```
 
@@ -276,11 +288,13 @@ Current local status:
 
 - `npm run lint` passes
 - `npm run build:web` passes
-- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `35` tests
+- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `38` tests
 - `bash scripts/check-version-consistency.sh` passes
+- compatibility fixtures can be regenerated locally with `bash scripts/generate-compat-fixtures.sh`
 
 For the full native-only roadmap and promotion rules for new formats, see [PLAN.md](/Users/tran_van_bach/Desktop/project/ziply/PLAN.md).
 
 ## License
 
 MIT. See [LICENSE](/Users/tran_van_bach/Desktop/project/ziply/LICENSE).
+- Extract password-protected `rar` archives on the native RAR5 path with password-check validation before files are copied into the final destination

@@ -7,17 +7,17 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct AppOverview {
     pub(crate) name: &'static str,
     pub(crate) tagline: &'static str,
-    pub(crate) supported_platforms: [&'static str; 3],
-    pub(crate) focus_areas: [&'static str; 3],
-    pub(crate) active_formats: [&'static str; 12],
-    pub(crate) planned_formats: [&'static str; 1],
+    pub(crate) supported_platforms: Vec<&'static str>,
+    pub(crate) focus_areas: Vec<&'static str>,
+    pub(crate) active_formats: Vec<&'static str>,
+    pub(crate) planned_formats: Vec<&'static str>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ArchiveCapabilities {
     pub(crate) native_archive_only: bool,
-    pub(crate) unsupported_formats: [&'static str; 1],
+    pub(crate) unsupported_formats: Vec<&'static str>,
 }
 
 #[derive(Deserialize)]
@@ -139,6 +139,7 @@ pub(crate) enum ArchiveFormat {
     Bz2,
     Gz,
     SevenZip,
+    Rar,
 }
 
 impl ArchiveFormat {
@@ -188,6 +189,13 @@ impl ArchiveFormat {
             return Ok(Self::SevenZip);
         }
 
+        if lower_name.ends_with(".rar")
+            || is_rar_volume_name(&lower_name)
+            || is_old_style_rar_segment_name(&lower_name)
+        {
+            return Ok(Self::Rar);
+        }
+
         if lower_name.ends_with(".xz") {
             return Ok(Self::Xz);
         }
@@ -200,7 +208,7 @@ impl ArchiveFormat {
             return Ok(Self::Gz);
         }
 
-        Err("unsupported archive extension. Ziply currently supports zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, and 7z.".to_string())
+        Err("unsupported archive extension. Ziply currently supports zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, 7z, and rar extraction.".to_string())
     }
 
     pub(crate) fn label(self) -> &'static str {
@@ -214,6 +222,7 @@ impl ArchiveFormat {
             Self::Bz2 => "bz2",
             Self::Gz => "gz",
             Self::SevenZip => "7z",
+            Self::Rar => "rar",
         }
     }
 
@@ -228,8 +237,28 @@ impl ArchiveFormat {
             Self::Bz2 => ".bz2",
             Self::Gz => ".gz",
             Self::SevenZip => ".7z",
+            Self::Rar => ".rar",
         }
     }
+}
+
+fn is_rar_volume_name(name: &str) -> bool {
+    let Some(start) = name.find(".part") else {
+        return false;
+    };
+    let Some(number) = name[start + 5..].strip_suffix(".rar") else {
+        return false;
+    };
+    !number.is_empty() && number.chars().all(|ch| ch.is_ascii_digit())
+}
+
+fn is_old_style_rar_segment_name(name: &str) -> bool {
+    let Some(extension) = name.rsplit('.').next() else {
+        return false;
+    };
+    extension.len() == 3
+        && extension.starts_with('r')
+        && extension[1..].chars().all(|ch| ch.is_ascii_digit())
 }
 
 #[derive(Clone, Copy)]

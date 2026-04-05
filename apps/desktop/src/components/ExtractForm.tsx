@@ -131,9 +131,9 @@ export function ExtractForm({
             Browse
           </button>
         </div>
-        <small>Supported now: zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, and 7z.</small>
+        <small>Supported now: zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, 7z, and rar extraction.</small>
         <small>
-          RAR is not supported yet. Ziply only ships native archive handlers.
+          RAR currently ships with native extract, preview, and selective extract, including multipart and password-protected RAR5 coverage. Ziply also routes `.part2.rar` and `.r00` style entries back to the first volume automatically. RAR creation is still out of scope for the current native stack.
         </small>
       </label>
 
@@ -173,8 +173,8 @@ export function ExtractForm({
         />
         <small>
           {supportsPasswordOnExtract(extractSource)
-            ? 'Use this for password-protected zip and 7z archives. The same password is used for preview and extraction.'
-            : 'Password-based extraction is currently supported for zip and 7z archives only.'}
+            ? 'Use this for password-protected zip, 7z, and rar archives. Ziply reuses the same password whenever preview or extraction needs it.'
+            : 'Password-based extraction is currently supported for zip, 7z, and rar archives only.'}
         </small>
       </label>
 

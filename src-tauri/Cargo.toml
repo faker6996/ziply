@@ -13,9 +13,12 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 bzip2 = "0.6.1"
 flate2 = "1"
+hmac = "0.12"
+rar = "0.4.0"
 sevenz-rust2 = "0.20.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 tar = "0.4"
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
