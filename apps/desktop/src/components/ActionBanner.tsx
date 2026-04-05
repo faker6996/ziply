@@ -12,6 +12,7 @@ export function ActionBanner({ feedback }: { feedback: ActionFeedback }) {
   return (
     <div className={`action-banner action-banner--${feedback.status}`}>
       <strong>{feedback.message}</strong>
+      {feedback.recoveryHint ? <p>{feedback.recoveryHint}</p> : null}
       {feedback.outputPath ? <span>{feedback.outputPath}</span> : null}
     </div>
   )

@@ -22,6 +22,7 @@ import {
   supportsArchivePasswordOnCompress,
   supportsArchivePasswordOnExtract,
   toDialogPaths,
+  recoveryHintForArchiveError,
 } from '../app/utils'
 
 interface UseArchiveActionsOptions {
@@ -178,6 +179,7 @@ export function useArchiveActions({
           setExtractFeedback({
             status: 'error',
             message: detail,
+            recoveryHint: recoveryHintForArchiveError(detail),
           })
         })
       }
@@ -230,6 +232,7 @@ export function useArchiveActions({
           setCompressFeedback({
             status: 'error',
             message: detail,
+            recoveryHint: recoveryHintForArchiveError(detail),
           })
         })
       }

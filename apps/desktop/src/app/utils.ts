@@ -244,3 +244,65 @@ export function archivePreviewSummary(entry: ArchivePreviewEntry) {
   const sizeLabel = formatEntrySize(entry.size)
   return sizeLabel ? `File • ${sizeLabel}` : 'File'
 }
+
+export function recoveryHintForArchiveError(message: string) {
+  const normalized = message.trim().toLowerCase()
+
+  if (!normalized) {
+    return undefined
+  }
+
+  if (
+    normalized.includes('invalid password') ||
+    normalized.includes('wrong password') ||
+    normalized.includes('incorrect password')
+  ) {
+    return 'Check the archive password, then run the job again. Encrypted archives cannot be previewed or extracted without the correct password.'
+  }
+
+  if (normalized.includes('password-protected archive creation is currently supported for 7z only')) {
+    return 'Switch the output format to 7z if you need encryption, or remove the password for zip, tar, tar.gz, tar.xz, or gz.'
+  }
+
+  if (normalized.includes('password-based extraction is currently supported for zip and 7z archives only')) {
+    return 'Remove the password for this archive type, or use a zip or 7z archive if encrypted extraction is required.'
+  }
+
+  if (normalized.includes('destination archive already exists')) {
+    return 'Choose Keep both or Overwrite, or change the output archive path before running the job again.'
+  }
+
+  if (normalized.includes('destination folder already exists and is not empty')) {
+    return 'Choose Keep both or Overwrite, or extract into a different folder.'
+  }
+
+  if (normalized.includes('archive file was not found') || normalized.includes('source path does not exist')) {
+    return 'Re-select the file or folder. The original path may have moved, been renamed, or is no longer mounted.'
+  }
+
+  if (normalized.includes('rar extraction requires an external tool')) {
+    return 'Install one of these backends on this machine: unar, 7zz, 7z, or unrar, then refresh Ziply shell capabilities.'
+  }
+
+  if (normalized.includes('preview is not available for rar yet')) {
+    return 'Extract the rar archive directly, or install a rar backend first if the archive cannot be opened yet.'
+  }
+
+  if (normalized.includes('unsupported archive extension') || normalized.includes('unsupported archive format')) {
+    return 'Use one of the supported formats: zip, tar, tar.gz, tar.xz, gz, 7z, and rar extraction when a backend is installed.'
+  }
+
+  if (normalized.includes('rar compression is not supported')) {
+    return 'Choose zip, tar, tar.gz, tar.xz, gz, or 7z as the output format. Rar creation is not available in Ziply.'
+  }
+
+  if (normalized.includes('gz compression currently supports exactly one source file')) {
+    return 'Keep only one source file for gz compression. Use tar.gz if you need to package multiple files or folders together.'
+  }
+
+  if (normalized.includes('gz compression only works with a single file, not a directory')) {
+    return 'Pick one file instead of a folder, or switch to tar.gz when you need directory compression.'
+  }
+
+  return undefined
+}

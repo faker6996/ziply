@@ -66,6 +66,7 @@ export interface ActionFeedback {
   status: ActionStatus
   message: string
   outputPath?: string
+  recoveryHint?: string
 }
 
 export interface DragDropState {
@@ -116,6 +117,7 @@ interface BaseQueueItem {
   sourceSummary: string
   outputPath: string
   message: string
+  recoveryHint?: string
   passwordProtected: boolean
   createdAt: number
   startedAt?: number
