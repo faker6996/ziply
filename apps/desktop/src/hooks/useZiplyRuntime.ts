@@ -63,12 +63,9 @@ export function useZiplyRuntime() {
   const handleShellIntentEvent = useEffectEvent(async (intent: ShellIntent) => {
     await handleShellIntent(intent)
   })
-  const handleDroppedPathsEvent = useEffectEvent(async (paths: string[]) => {
-    await handleDroppedPaths(paths)
-  })
   const { dragDropState } = useDesktopDragDrop({
     desktopShell,
-    onDropPaths: handleDroppedPathsEvent,
+    onDropPaths: handleDroppedPaths,
   })
 
   useEffect(() => {

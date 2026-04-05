@@ -64,31 +64,31 @@ export function useDesktopDragDrop({
 
     void getCurrentWindow()
       .onDragDropEvent((event) => {
-        if (event.payload.type === 'enter') {
-          startTransition(() => {
-            setDragDropState(describeDrop(event.payload.paths))
-          })
-          return
-        }
+        const payload = event.payload
 
-        if (event.payload.type === 'over') {
-          startTransition(() => {
-            setDragDropState((currentState) => ({ ...currentState, active: true }))
-          })
-          return
+        switch (payload.type) {
+          case 'enter':
+            startTransition(() => {
+              setDragDropState(describeDrop(payload.paths))
+            })
+            return
+          case 'over':
+            startTransition(() => {
+              setDragDropState((currentState) => ({ ...currentState, active: true }))
+            })
+            return
+          case 'leave':
+            startTransition(() => {
+              setDragDropState(idleState)
+            })
+            return
+          case 'drop':
+            startTransition(() => {
+              setDragDropState(idleState)
+            })
+            void handleDropPaths(payload.paths)
+            return
         }
-
-        if (event.payload.type === 'leave') {
-          startTransition(() => {
-            setDragDropState(idleState)
-          })
-          return
-        }
-
-        startTransition(() => {
-          setDragDropState(idleState)
-        })
-        void handleDropPaths(event.payload.paths)
       })
       .then((dispose) => {
         unlisten = dispose
