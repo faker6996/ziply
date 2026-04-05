@@ -6,9 +6,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run tauri --workspace @ziply/desktop -- dev",
+    "dev": "node scripts/run-tauri.js dev",
     "dev:web": "npm run dev --workspace @ziply/desktop",
-    "build": "npm run tauri --workspace @ziply/desktop -- build",
+    "build": "node scripts/run-tauri.js build",
     "build:web": "npm run build --workspace @ziply/desktop",
     "lint": "npm run lint --workspace @ziply/desktop"
   }
