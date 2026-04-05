@@ -97,7 +97,10 @@ jobs:
             exit 1
           fi
 
-          mapfile -t files < <(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name "*.$ARTIFACT_EXTENSION" | sort)
+          files=()
+          while IFS= read -r file; do
+            files+=("$file")
+          done < <(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name "*.$ARTIFACT_EXTENSION" | sort)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No .$ARTIFACT_EXTENSION artifacts found in $ARTIFACT_DIR"
             exit 1
@@ -211,13 +214,18 @@ jobs:
             local label="$1"
             local directory="$2"
             local extension="$3"
+            local files=()
+            local file
+            local size_bytes
 
             if [ ! -d "$directory" ]; then
               echo "Missing release asset directory for $label: $directory"
               exit 1
             fi
 
-            mapfile -t files < <(find "$directory" -maxdepth 1 -type f -name "*.$extension" | sort)
+            while IFS= read -r file; do
+              files+=("$file")
+            done < <(find "$directory" -maxdepth 1 -type f -name "*.$extension" | sort)
             if [ "${#files[@]}" -eq 0 ]; then
               echo "No .$extension release assets found for $label in $directory"
               exit 1
