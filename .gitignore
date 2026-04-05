@@ -29,6 +29,11 @@ apps/desktop/**/*.tsbuildinfo
 apps/desktop/coverage/
 
 src-tauri/gen/
-src-tauri/tests/
+src-tauri/tests/*
+!src-tauri/tests/fixtures/
+!src-tauri/tests/fixtures/compat/
+!src-tauri/tests/fixtures/compat/**
 src-tauri/testdata/
-src-tauri/fixtures/
+src-tauri/fixtures/*
+!src-tauri/fixtures/rar/
+!src-tauri/fixtures/rar/**
