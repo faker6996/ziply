@@ -1,16 +1,19 @@
 import type { FormEvent } from 'react'
-import type { ActionFeedback, ArchiveCapabilities } from '../app/types'
+import { conflictPolicyOptions } from '../app/defaults'
+import type { ActionFeedback, ArchiveCapabilities, ConflictPolicy } from '../app/types'
 import { ActionBanner } from './ActionBanner'
 
 interface ExtractFormProps {
   desktopShell: boolean
   extractSource: string
   extractDestination: string
+  extractConflictPolicy: ConflictPolicy
   capabilities: ArchiveCapabilities
   feedback: ActionFeedback
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
   onExtractSourceChange: (value: string) => void
   onExtractDestinationChange: (value: string) => void
+  onExtractConflictPolicyChange: (value: ConflictPolicy) => void
   onPickExtractSource: () => void
   onPickExtractDestination: () => void
 }
@@ -19,11 +22,13 @@ export function ExtractForm({
   desktopShell,
   extractSource,
   extractDestination,
+  extractConflictPolicy,
   capabilities,
   feedback,
   onSubmit,
   onExtractSourceChange,
   onExtractDestinationChange,
+  onExtractConflictPolicyChange,
   onPickExtractSource,
   onPickExtractDestination,
 }: ExtractFormProps) {
@@ -85,6 +90,29 @@ export function ExtractForm({
           {capabilities.rarExtractionAvailable
             ? `rar extraction is available through ${capabilities.rarExtractorLabel}.`
             : 'rar extraction needs an installed backend such as unar, 7zz, 7z, or unrar.'}
+        </small>
+      </label>
+
+      <label className="field">
+        <span>Conflict handling</span>
+        <select
+          className="text-input"
+          onChange={(event) => {
+            onExtractConflictPolicyChange(event.target.value as ConflictPolicy)
+          }}
+          value={extractConflictPolicy}
+        >
+          {conflictPolicyOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <small>
+          {
+            conflictPolicyOptions.find((option) => option.value === extractConflictPolicy)
+              ?.description
+          }
         </small>
       </label>
 

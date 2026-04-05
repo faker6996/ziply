@@ -10,14 +10,18 @@ use tauri::Manager;
 
 use crate::{
     archive::{is_supported_archive_path, path_to_string},
-    commands::{archive as archive_commands, metadata as metadata_commands, shell as shell_commands},
+    commands::{
+        archive as archive_commands, metadata as metadata_commands, shell as shell_commands,
+    },
     models::PendingShellIntents,
     shell::{collect_launch_shell_intents, shell_extract_intent, store_shell_intents},
 };
 
 pub fn run() {
     let app = tauri::Builder::default()
-        .manage(PendingShellIntents(Mutex::new(collect_launch_shell_intents())))
+        .manage(PendingShellIntents(Mutex::new(
+            collect_launch_shell_intents(),
+        )))
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             metadata_commands::app_overview,
@@ -94,8 +98,7 @@ mod tests {
         write_file(&root_file, "top level zip content");
 
         let archive_path = workspace.join("bundle.zip");
-        create_zip_archive(&[source_directory.clone()], &archive_path)
-            .expect("create zip archive");
+        create_zip_archive(&[source_directory.clone()], &archive_path).expect("create zip archive");
 
         let extract_directory = workspace.join("extract");
         extract_zip_archive(&archive_path, &extract_directory).expect("extract zip archive");
@@ -124,8 +127,7 @@ mod tests {
             .expect("create tar.gz archive");
 
         let extract_directory = workspace.join("extract");
-        extract_tar_gz_archive(&archive_path, &extract_directory)
-            .expect("extract tar.gz archive");
+        extract_tar_gz_archive(&archive_path, &extract_directory).expect("extract tar.gz archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("source/images/logo.txt"))
@@ -146,8 +148,7 @@ mod tests {
             .expect("create tar.xz archive");
 
         let extract_directory = workspace.join("extract");
-        extract_tar_xz_archive(&archive_path, &extract_directory)
-            .expect("extract tar.xz archive");
+        extract_tar_xz_archive(&archive_path, &extract_directory).expect("extract tar.xz archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("source/images/logo.txt"))
@@ -184,8 +185,7 @@ mod tests {
         write_file(&nested_file, "7z content");
 
         let archive_path = workspace.join("bundle.7z");
-        create_7z_archive(&[source_directory.clone()], &archive_path)
-            .expect("create 7z archive");
+        create_7z_archive(&[source_directory.clone()], &archive_path).expect("create 7z archive");
 
         let extract_directory = workspace.join("extract");
         extract_7z_archive(&archive_path, &extract_directory).expect("extract 7z archive");

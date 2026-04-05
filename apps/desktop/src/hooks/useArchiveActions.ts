@@ -5,12 +5,16 @@ import { emptyFeedback } from '../app/defaults'
 import type {
   ActionFeedback,
   ArchiveActionResult,
+  CompressArchiveRequest,
   CompressFormat,
+  ConflictPolicy,
+  ExtractArchiveRequest,
   ShellIntent,
 } from '../app/types'
 import {
   normalizePaths,
   pathsToText,
+  isArchivePath,
   suggestArchiveName,
   suggestExtractDestination,
   toDialogPaths,
@@ -28,9 +32,11 @@ export function useArchiveActions({
   const [compressSources, setCompressSources] = useState('')
   const [compressDestination, setCompressDestination] = useState('')
   const [compressFormat, setCompressFormat] = useState<CompressFormat>('zip')
+  const [compressConflictPolicy, setCompressConflictPolicy] = useState<ConflictPolicy>('keepBoth')
   const [compressFeedback, setCompressFeedback] = useState<ActionFeedback>(emptyFeedback)
   const [extractSource, setExtractSource] = useState('')
   const [extractDestination, setExtractDestination] = useState('')
+  const [extractConflictPolicy, setExtractConflictPolicy] = useState<ConflictPolicy>('keepBoth')
   const [extractFeedback, setExtractFeedback] = useState<ActionFeedback>(emptyFeedback)
 
   const normalizedCompressSources = normalizePaths(compressSources)
@@ -48,14 +54,16 @@ export function useArchiveActions({
     setExtractFeedback({
       status: 'running',
       message: 'Extracting archive...',
-    })
+      })
 
     try {
+      const request: ExtractArchiveRequest = {
+        archivePath,
+        destinationDirectory,
+        conflictPolicy: extractConflictPolicy,
+      }
       const result = await invoke<ArchiveActionResult>('extract_archive', {
-        request: {
-          archivePath,
-          destinationDirectory,
-        },
+        request,
       })
 
       startTransition(() => {
@@ -96,12 +104,14 @@ export function useArchiveActions({
     })
 
     try {
+      const request: CompressArchiveRequest = {
+        sourcePaths,
+        destinationPath,
+        format,
+        conflictPolicy: compressConflictPolicy,
+      }
       const result = await invoke<ArchiveActionResult>('compress_archive', {
-        request: {
-          sourcePaths,
-          destinationPath,
-          format,
-        },
+        request,
       })
 
       startTransition(() => {
@@ -159,6 +169,43 @@ export function useArchiveActions({
     if (intent.autoRun) {
       await executeExtract(archivePath, destinationDirectory)
     }
+  }
+
+  function handleDroppedPaths(nextPaths: string[]) {
+    const normalizedPaths = Array.from(
+      new Set(nextPaths.map((path) => path.trim()).filter(Boolean)),
+    )
+
+    if (normalizedPaths.length === 0) {
+      return
+    }
+
+    if (normalizedPaths.length === 1 && isArchivePath(normalizedPaths[0])) {
+      const archivePath = normalizedPaths[0]
+      const destinationDirectory = suggestExtractDestination(archivePath, false)
+
+      startTransition(() => {
+        setExtractSource(archivePath)
+        setExtractDestination(destinationDirectory)
+        setExtractFeedback({
+          status: 'success',
+          message: 'Archive loaded from drag and drop. Review the destination and extract when ready.',
+          outputPath: destinationDirectory,
+        })
+      })
+      return
+    }
+
+    appendCompressSources(normalizedPaths)
+    startTransition(() => {
+      setCompressFeedback({
+        status: 'success',
+        message:
+          normalizedPaths.length === 1
+            ? 'Item loaded from drag and drop. Choose a format and create the archive.'
+            : `${normalizedPaths.length} items loaded from drag and drop. Choose a format and create the archive.`,
+      })
+    })
   }
 
   function appendCompressSources(nextPaths: string[]) {
@@ -252,18 +299,23 @@ export function useArchiveActions({
     compressSources,
     compressDestination,
     compressFormat,
+    compressConflictPolicy,
     compressFeedback,
     extractSource,
     extractDestination,
+    extractConflictPolicy,
     extractFeedback,
     normalizedCompressSources,
     gzipSourceCount,
     setCompressSources,
     setCompressDestination,
     setCompressFormat,
+    setCompressConflictPolicy,
     setExtractSource,
     setExtractDestination,
+    setExtractConflictPolicy,
     handleShellIntent,
+    handleDroppedPaths,
     pickCompressFiles,
     pickCompressFolders,
     pickCompressDestination,

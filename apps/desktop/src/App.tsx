@@ -1,4 +1,5 @@
 import { CompressForm } from './components/CompressForm'
+import { DropZonePanel } from './components/DropZonePanel'
 import { ExtractForm } from './components/ExtractForm'
 import { LiveJobsPanel } from './components/LiveJobsPanel'
 import { OverviewPanels } from './components/OverviewPanels'
@@ -17,19 +18,24 @@ function App() {
     compressSources,
     compressDestination,
     compressFormat,
+    compressConflictPolicy,
     compressFeedback,
     extractSource,
     extractDestination,
+    extractConflictPolicy,
     extractFeedback,
     shellIntegrationFeedback,
+    dragDropState,
     desktopShell,
     normalizedCompressSources,
     gzipSourceCount,
     setCompressSources,
     setCompressDestination,
     setCompressFormat,
+    setCompressConflictPolicy,
     setExtractSource,
     setExtractDestination,
+    setExtractConflictPolicy,
     refreshHistory,
     refreshShellIntegration,
     clearHistory,
@@ -67,10 +73,15 @@ function App() {
         </div>
       </section>
 
+      <section className="detail-grid">
+        <DropZonePanel desktopShell={desktopShell} dragDropState={dragDropState} />
+      </section>
+
       <section className="grid grid--tools">
         <CompressForm
           compressDestination={compressDestination}
           compressFormat={compressFormat}
+          compressConflictPolicy={compressConflictPolicy}
           compressSources={compressSources}
           desktopShell={desktopShell}
           feedback={compressFeedback}
@@ -78,6 +89,7 @@ function App() {
           normalizedCompressSources={normalizedCompressSources}
           onCompressDestinationChange={setCompressDestination}
           onCompressFormatChange={setCompressFormat}
+          onCompressConflictPolicyChange={setCompressConflictPolicy}
           onCompressSourcesChange={setCompressSources}
           onPickCompressDestination={() => {
             void pickCompressDestination()
@@ -95,8 +107,10 @@ function App() {
           capabilities={capabilities}
           desktopShell={desktopShell}
           extractDestination={extractDestination}
+          extractConflictPolicy={extractConflictPolicy}
           extractSource={extractSource}
           feedback={extractFeedback}
+          onExtractConflictPolicyChange={setExtractConflictPolicy}
           onExtractDestinationChange={setExtractDestination}
           onExtractSourceChange={setExtractSource}
           onPickExtractDestination={() => {

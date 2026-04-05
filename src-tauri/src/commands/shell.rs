@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::{
     history::{load_archive_history, persist_archive_history},
-    models::{ArchiveHistoryEntry, PendingShellIntents, ShellIntent, ShellIntegrationStatus},
+    models::{ArchiveHistoryEntry, PendingShellIntents, ShellIntegrationStatus, ShellIntent},
     shell::{current_shell_integration_status, install_current_shell_integration},
 };
 

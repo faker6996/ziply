@@ -43,6 +43,34 @@
   gap: 8px;
 }
 
+.dropzone-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.dropzone-copy strong {
+  color: #fff4d4;
+}
+
+.panel-card--dropzone {
+  border-style: dashed;
+  border-width: 1.5px;
+  background:
+    linear-gradient(160deg, rgba(247, 197, 106, 0.12), rgba(86, 156, 255, 0.08)),
+    rgba(7, 15, 24, 0.68);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.panel-card--dropzone-active {
+  border-color: rgba(247, 197, 106, 0.88);
+  box-shadow: 0 28px 90px rgba(247, 197, 106, 0.16);
+  transform: translateY(-2px);
+}
+
 .support-note strong {
   color: #fff4d4;
 }

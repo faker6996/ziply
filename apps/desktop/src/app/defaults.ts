@@ -5,6 +5,7 @@ import type {
   ArchiveHistoryEntry,
   ArchiveJobEvent,
   CompressFormat,
+  ConflictPolicy,
   ShellIntent,
   ShellIntegrationStatus,
 } from './types'
@@ -52,4 +53,26 @@ export const compressFormatOptions: CompressFormat[] = [
   'tar.xz',
   'gz',
   '7z',
+]
+
+export const conflictPolicyOptions: Array<{
+  value: ConflictPolicy
+  label: string
+  description: string
+}> = [
+  {
+    value: 'keepBoth',
+    label: 'Keep both',
+    description: 'Create a new archive or folder name when the destination already exists.',
+  },
+  {
+    value: 'overwrite',
+    label: 'Overwrite',
+    description: 'Replace the existing destination before the archive job runs.',
+  },
+  {
+    value: 'stop',
+    label: 'Stop on conflict',
+    description: 'Abort the job if the destination already exists.',
+  },
 ]

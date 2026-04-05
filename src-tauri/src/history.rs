@@ -44,8 +44,12 @@ pub(crate) fn persist_archive_history(
     let path = archive_history_file_path(app)?;
     let bytes = serde_json::to_vec_pretty(history)
         .map_err(|error| format!("failed to serialize archive history: {error}"))?;
-    fs::write(&path, bytes)
-        .map_err(|error| format!("failed to write archive history {}: {error}", path.display()))
+    fs::write(&path, bytes).map_err(|error| {
+        format!(
+            "failed to write archive history {}: {error}",
+            path.display()
+        )
+    })
 }
 
 pub(crate) fn append_archive_history(

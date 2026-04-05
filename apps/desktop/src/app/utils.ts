@@ -164,3 +164,7 @@ export function suggestExtractDestination(archivePath: string, extractHere: bool
   const baseName = stripArchiveExtension(archivePath)
   return baseName === archivePath ? parent : baseName
 }
+
+export function isArchivePath(path: string) {
+  return /\.(tar\.gz|tar\.xz|tgz|txz|zip|tar|gz|7z|rar)$/i.test(path.trim())
+}

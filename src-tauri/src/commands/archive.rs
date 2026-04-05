@@ -29,11 +29,10 @@ pub(crate) fn compress_archive(
     let format = ArchiveFormat::from_compress_input(&request.format)?;
     let source_paths = normalize_source_paths(&request.source_paths)?;
     let conflict_policy = ConflictPolicy::from_input(request.conflict_policy.as_deref())?;
-    let destination_path =
-        resolve_archive_output_path(
-            &normalize_destination_path(&request.destination_path, format)?,
-            conflict_policy,
-        )?;
+    let destination_path = resolve_archive_output_path(
+        &normalize_destination_path(&request.destination_path, format)?,
+        conflict_policy,
+    )?;
     let job_id = archive_job_id();
     let source_summary = summarize_paths(&source_paths);
 
@@ -58,7 +57,9 @@ pub(crate) fn compress_archive(
             return Err("gz compression currently supports exactly one source file.".to_string());
         }
         if source_paths[0].is_dir() {
-            return Err("gz compression only works with a single file, not a directory.".to_string());
+            return Err(
+                "gz compression only works with a single file, not a directory.".to_string(),
+            );
         }
     }
 
@@ -87,76 +88,78 @@ pub(crate) fn compress_archive(
         },
     );
 
-    let execution = (|| -> Result<ArchiveActionResult, String> {
-        emit_archive_job_event(
-            &app,
-            ArchiveJobEvent {
-                job_id: job_id.clone(),
-                operation: "compress".to_string(),
-                format: format.label().to_string(),
-                stage: "processing".to_string(),
-                status: "running".to_string(),
-                message: format!("Creating {} archive contents.", format.label()),
-                progress: 58,
-                source_summary: source_summary.clone(),
-                output_path: Some(path_to_string(&destination_path)),
-                timestamp_ms: unix_timestamp_ms(),
-            },
-        );
+    let execution =
+        (|| -> Result<ArchiveActionResult, String> {
+            emit_archive_job_event(
+                &app,
+                ArchiveJobEvent {
+                    job_id: job_id.clone(),
+                    operation: "compress".to_string(),
+                    format: format.label().to_string(),
+                    stage: "processing".to_string(),
+                    status: "running".to_string(),
+                    message: format!("Creating {} archive contents.", format.label()),
+                    progress: 58,
+                    source_summary: source_summary.clone(),
+                    output_path: Some(path_to_string(&destination_path)),
+                    timestamp_ms: unix_timestamp_ms(),
+                },
+            );
 
-        match format {
-            ArchiveFormat::Zip => create_zip_archive(&source_paths, &destination_path)?,
-            ArchiveFormat::Tar => create_tar_archive(&source_paths, &destination_path)?,
-            ArchiveFormat::TarGz => create_tar_gz_archive(&source_paths, &destination_path)?,
-            ArchiveFormat::TarXz => create_tar_xz_archive(&source_paths, &destination_path)?,
-            ArchiveFormat::Gz => create_gz_archive(&source_paths[0], &destination_path)?,
-            ArchiveFormat::SevenZip => create_7z_archive(&source_paths, &destination_path)?,
-            ArchiveFormat::Rar => {
-                return Err("rar compression is not supported. Use zip, tar, tar.gz, gz, or 7z instead.".to_string())
+            match format {
+                ArchiveFormat::Zip => create_zip_archive(&source_paths, &destination_path)?,
+                ArchiveFormat::Tar => create_tar_archive(&source_paths, &destination_path)?,
+                ArchiveFormat::TarGz => create_tar_gz_archive(&source_paths, &destination_path)?,
+                ArchiveFormat::TarXz => create_tar_xz_archive(&source_paths, &destination_path)?,
+                ArchiveFormat::Gz => create_gz_archive(&source_paths[0], &destination_path)?,
+                ArchiveFormat::SevenZip => create_7z_archive(&source_paths, &destination_path)?,
+                ArchiveFormat::Rar => return Err(
+                    "rar compression is not supported. Use zip, tar, tar.gz, gz, or 7z instead."
+                        .to_string(),
+                ),
             }
-        }
 
-        emit_archive_job_event(
-            &app,
-            ArchiveJobEvent {
-                job_id: job_id.clone(),
-                operation: "compress".to_string(),
-                format: format.label().to_string(),
-                stage: "finalizing".to_string(),
-                status: "running".to_string(),
-                message: "Finalizing archive and saving recent activity.".to_string(),
-                progress: 88,
-                source_summary: source_summary.clone(),
-                output_path: Some(path_to_string(&destination_path)),
-                timestamp_ms: unix_timestamp_ms(),
-            },
-        );
+            emit_archive_job_event(
+                &app,
+                ArchiveJobEvent {
+                    job_id: job_id.clone(),
+                    operation: "compress".to_string(),
+                    format: format.label().to_string(),
+                    stage: "finalizing".to_string(),
+                    status: "running".to_string(),
+                    message: "Finalizing archive and saving recent activity.".to_string(),
+                    progress: 88,
+                    source_summary: source_summary.clone(),
+                    output_path: Some(path_to_string(&destination_path)),
+                    timestamp_ms: unix_timestamp_ms(),
+                },
+            );
 
-        let result = ArchiveActionResult {
-            operation: "compress",
-            format: format.label(),
-            output_path: path_to_string(&destination_path),
-            message: format!(
-                "Created {} archive at {}",
-                format.label(),
-                destination_path.display()
-            ),
-        };
+            let result = ArchiveActionResult {
+                operation: "compress",
+                format: format.label(),
+                output_path: path_to_string(&destination_path),
+                message: format!(
+                    "Created {} archive at {}",
+                    format.label(),
+                    destination_path.display()
+                ),
+            };
 
-        append_archive_history(
-            &app,
-            ArchiveHistoryEntry {
-                id: archive_history_id(),
-                operation: "compress".to_string(),
-                format: format.label().to_string(),
-                source_summary: source_summary.clone(),
-                output_path: result.output_path.clone(),
-                timestamp_ms: unix_timestamp_ms(),
-            },
-        )?;
+            append_archive_history(
+                &app,
+                ArchiveHistoryEntry {
+                    id: archive_history_id(),
+                    operation: "compress".to_string(),
+                    format: format.label().to_string(),
+                    source_summary: source_summary.clone(),
+                    output_path: result.output_path.clone(),
+                    timestamp_ms: unix_timestamp_ms(),
+                },
+            )?;
 
-        Ok(result)
-    })();
+            Ok(result)
+        })();
 
     match execution {
         Ok(result) => {

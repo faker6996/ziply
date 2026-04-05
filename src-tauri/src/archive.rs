@@ -51,21 +51,30 @@ pub(crate) fn normalize_destination_path(
         if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
             return Ok(PathBuf::from(trimmed));
         }
-        return Ok(PathBuf::from(format!("{trimmed}{}", format.preferred_suffix())));
+        return Ok(PathBuf::from(format!(
+            "{trimmed}{}",
+            format.preferred_suffix()
+        )));
     }
 
     if matches!(format, ArchiveFormat::TarXz) {
         if lower.ends_with(".tar.xz") || lower.ends_with(".txz") {
             return Ok(PathBuf::from(trimmed));
         }
-        return Ok(PathBuf::from(format!("{trimmed}{}", format.preferred_suffix())));
+        return Ok(PathBuf::from(format!(
+            "{trimmed}{}",
+            format.preferred_suffix()
+        )));
     }
 
     if lower.ends_with(format.preferred_suffix()) {
         return Ok(PathBuf::from(trimmed));
     }
 
-    Ok(PathBuf::from(format!("{trimmed}{}", format.preferred_suffix())))
+    Ok(PathBuf::from(format!(
+        "{trimmed}{}",
+        format.preferred_suffix()
+    )))
 }
 
 pub(crate) fn normalize_archive_path(archive_path: &str) -> Result<PathBuf, String> {
@@ -238,7 +247,10 @@ fn append_zip_file<W: Write + Seek>(
 ) -> Result<(), String> {
     let archive_name = relative_path.to_string_lossy().replace('\\', "/");
     let mut file = BufReader::new(File::open(source_path).map_err(|error| {
-        format!("failed to open source file {}: {error}", source_path.display())
+        format!(
+            "failed to open source file {}: {error}",
+            source_path.display()
+        )
     })?);
 
     archive
@@ -344,8 +356,12 @@ fn append_tar_source<W: Write>(
 }
 
 pub(crate) fn create_gz_archive(source_path: &Path, destination_path: &Path) -> Result<(), String> {
-    let input_file = File::open(source_path)
-        .map_err(|error| format!("failed to open source file {}: {error}", source_path.display()))?;
+    let input_file = File::open(source_path).map_err(|error| {
+        format!(
+            "failed to open source file {}: {error}",
+            source_path.display()
+        )
+    })?;
     let output_file = File::create(destination_path).map_err(|error| {
         format!(
             "failed to create archive {}: {error}",
@@ -638,9 +654,15 @@ fn run_external_rar_extract(
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let detail = if !stderr.is_empty() { stderr } else { stdout };
     Err(if detail.is_empty() {
-        format!("{} failed while extracting the rar archive", extractor.label())
+        format!(
+            "{} failed while extracting the rar archive",
+            extractor.label()
+        )
     } else {
-        format!("{} failed while extracting the rar archive: {detail}", extractor.label())
+        format!(
+            "{} failed while extracting the rar archive: {detail}",
+            extractor.label()
+        )
     })
 }
 
@@ -708,17 +730,29 @@ fn safe_join(base_directory: &Path, relative_path: &Path) -> Result<PathBuf, Str
 
 fn remove_existing_path(path: &Path) -> Result<(), String> {
     if path.is_dir() {
-        fs::remove_dir_all(path)
-            .map_err(|error| format!("failed to replace existing directory {}: {error}", path.display()))
+        fs::remove_dir_all(path).map_err(|error| {
+            format!(
+                "failed to replace existing directory {}: {error}",
+                path.display()
+            )
+        })
     } else {
-        fs::remove_file(path)
-            .map_err(|error| format!("failed to replace existing file {}: {error}", path.display()))
+        fs::remove_file(path).map_err(|error| {
+            format!(
+                "failed to replace existing file {}: {error}",
+                path.display()
+            )
+        })
     }
 }
 
 fn directory_is_empty(path: &Path) -> Result<bool, String> {
-    let mut entries = fs::read_dir(path)
-        .map_err(|error| format!("failed to inspect destination folder {}: {error}", path.display()))?;
+    let mut entries = fs::read_dir(path).map_err(|error| {
+        format!(
+            "failed to inspect destination folder {}: {error}",
+            path.display()
+        )
+    })?;
     Ok(entries.next().is_none())
 }
 

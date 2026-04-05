@@ -11,7 +11,7 @@ use tauri::{AppHandle, Manager};
 use crate::{
     archive::{is_supported_archive_path, path_to_string},
     history::emit_shell_intent,
-    models::{PendingShellIntents, ShellIntent, ShellIntegrationStatus},
+    models::{PendingShellIntents, ShellIntegrationStatus, ShellIntent},
 };
 
 #[cfg(target_os = "linux")]
@@ -78,7 +78,10 @@ pub(crate) fn shell_extract_intent(path: &str, auto_run: bool) -> ShellIntent {
     }
 }
 
-pub(crate) fn store_shell_intents(app: &AppHandle, intents: Vec<ShellIntent>) -> Result<(), String> {
+pub(crate) fn store_shell_intents(
+    app: &AppHandle,
+    intents: Vec<ShellIntent>,
+) -> Result<(), String> {
     if intents.is_empty() {
         return Ok(());
     }
@@ -164,8 +167,16 @@ fn install_windows_shell_integration(executable: &Path) -> Result<(), String> {
 
     for extension in archive_extensions {
         let base_key = format!(r"HKCU\Software\Classes\SystemFileAssociations\{extension}\shell");
-        add_windows_registry_value(&format!(r"{base_key}\ZiplyExtract"), None, "Extract with Ziply")?;
-        add_windows_registry_value(&format!(r"{base_key}\ZiplyExtract"), Some("Icon"), &path_to_string(executable))?;
+        add_windows_registry_value(
+            &format!(r"{base_key}\ZiplyExtract"),
+            None,
+            "Extract with Ziply",
+        )?;
+        add_windows_registry_value(
+            &format!(r"{base_key}\ZiplyExtract"),
+            Some("Icon"),
+            &path_to_string(executable),
+        )?;
         add_windows_registry_value(
             &format!(r"{base_key}\ZiplyExtract\command"),
             None,
@@ -311,7 +322,10 @@ pub(crate) fn current_shell_integration_status() -> ShellIntegrationStatus {
 
 #[cfg(target_os = "macos")]
 pub(crate) fn install_current_shell_integration() -> Result<(), String> {
-    Err("macOS custom Finder context commands are not installed in this beta build yet.".to_string())
+    Err(
+        "macOS custom Finder context commands are not installed in this beta build yet."
+            .to_string(),
+    )
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]

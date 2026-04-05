@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
-import { compressFormatOptions } from '../app/defaults'
-import type { ActionFeedback, CompressFormat } from '../app/types'
+import { compressFormatOptions, conflictPolicyOptions } from '../app/defaults'
+import type { ActionFeedback, CompressFormat, ConflictPolicy } from '../app/types'
 import { suggestArchiveName } from '../app/utils'
 import { ActionBanner } from './ActionBanner'
 
@@ -9,6 +9,7 @@ interface CompressFormProps {
   compressSources: string
   compressDestination: string
   compressFormat: CompressFormat
+  compressConflictPolicy: ConflictPolicy
   normalizedCompressSources: string[]
   gzipSourceCount: number
   feedback: ActionFeedback
@@ -16,6 +17,7 @@ interface CompressFormProps {
   onCompressSourcesChange: (value: string) => void
   onCompressDestinationChange: (value: string) => void
   onCompressFormatChange: (value: CompressFormat) => void
+  onCompressConflictPolicyChange: (value: ConflictPolicy) => void
   onPickCompressFiles: () => void
   onPickCompressFolders: () => void
   onPickCompressDestination: () => void
@@ -26,6 +28,7 @@ export function CompressForm({
   compressSources,
   compressDestination,
   compressFormat,
+  compressConflictPolicy,
   normalizedCompressSources,
   gzipSourceCount,
   feedback,
@@ -33,6 +36,7 @@ export function CompressForm({
   onCompressSourcesChange,
   onCompressDestinationChange,
   onCompressFormatChange,
+  onCompressConflictPolicyChange,
   onPickCompressFiles,
   onPickCompressFolders,
   onPickCompressDestination,
@@ -119,6 +123,29 @@ export function CompressForm({
           </div>
         </label>
       </div>
+
+      <label className="field">
+        <span>Conflict handling</span>
+        <select
+          className="text-input"
+          onChange={(event) => {
+            onCompressConflictPolicyChange(event.target.value as ConflictPolicy)
+          }}
+          value={compressConflictPolicy}
+        >
+          {conflictPolicyOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <small>
+          {
+            conflictPolicyOptions.find((option) => option.value === compressConflictPolicy)
+              ?.description
+          }
+        </small>
+      </label>
 
       {compressFormat === 'gz' ? (
         <p className={`inline-note ${gzipSourceCount === 1 ? '' : 'inline-note--warning'}`}>

@@ -10,6 +10,7 @@ import type { ShellIntent } from '../app/types'
 import { isDesktopShell, loadBootstrapData } from '../app/utils'
 import { useArchiveActions } from './useArchiveActions'
 import { useArchiveHistory } from './useArchiveHistory'
+import { useDesktopDragDrop } from './useDesktopDragDrop'
 import { useLiveJobs } from './useLiveJobs'
 import { useShellIntegration } from './useShellIntegration'
 
@@ -31,18 +32,23 @@ export function useZiplyRuntime() {
     compressSources,
     compressDestination,
     compressFormat,
+    compressConflictPolicy,
     compressFeedback,
     extractSource,
     extractDestination,
+    extractConflictPolicy,
     extractFeedback,
     normalizedCompressSources,
     gzipSourceCount,
     setCompressSources,
     setCompressDestination,
     setCompressFormat,
+    setCompressConflictPolicy,
     setExtractSource,
     setExtractDestination,
+    setExtractConflictPolicy,
     handleShellIntent,
+    handleDroppedPaths,
     pickCompressFiles,
     pickCompressFolders,
     pickCompressDestination,
@@ -56,6 +62,13 @@ export function useZiplyRuntime() {
   })
   const handleShellIntentEvent = useEffectEvent(async (intent: ShellIntent) => {
     await handleShellIntent(intent)
+  })
+  const handleDroppedPathsEvent = useEffectEvent(async (paths: string[]) => {
+    await handleDroppedPaths(paths)
+  })
+  const { dragDropState } = useDesktopDragDrop({
+    desktopShell,
+    onDropPaths: handleDroppedPathsEvent,
   })
 
   useEffect(() => {
@@ -134,19 +147,24 @@ export function useZiplyRuntime() {
     compressSources,
     compressDestination,
     compressFormat,
+    compressConflictPolicy,
     compressFeedback,
     extractSource,
     extractDestination,
+    extractConflictPolicy,
     extractFeedback,
     shellIntegrationFeedback,
+    dragDropState,
     desktopShell,
     normalizedCompressSources,
     gzipSourceCount,
     setCompressSources,
     setCompressDestination,
     setCompressFormat,
+    setCompressConflictPolicy,
     setExtractSource,
     setExtractDestination,
+    setExtractConflictPolicy,
     refreshHistory,
     refreshShellIntegration,
     clearHistory,

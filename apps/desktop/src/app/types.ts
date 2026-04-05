@@ -58,10 +58,30 @@ export interface ShellIntegrationStatus {
 }
 
 export type CompressFormat = 'zip' | 'tar' | 'tar.gz' | 'tar.xz' | 'gz' | '7z'
+export type ConflictPolicy = 'keepBoth' | 'overwrite' | 'stop'
 export type ActionStatus = 'idle' | 'running' | 'success' | 'error'
 
 export interface ActionFeedback {
   status: ActionStatus
   message: string
   outputPath?: string
+}
+
+export interface DragDropState {
+  active: boolean
+  intent: 'idle' | 'compress' | 'extract'
+  message: string
+}
+
+export interface CompressArchiveRequest {
+  sourcePaths: string[]
+  destinationPath: string
+  format: CompressFormat
+  conflictPolicy: ConflictPolicy
+}
+
+export interface ExtractArchiveRequest {
+  archivePath: string
+  destinationDirectory: string
+  conflictPolicy: ConflictPolicy
 }
