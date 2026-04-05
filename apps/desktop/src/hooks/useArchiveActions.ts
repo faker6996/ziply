@@ -30,6 +30,7 @@ interface UseArchiveActionsOptions {
   desktopShell: boolean
   refreshHistory: () => Promise<void>
   extractDestinationMode: 'askEveryTime' | 'archiveFolder' | 'rememberLast'
+  deleteAfterExtraction: boolean
   lastExtractDestination: string
   onRememberExtractDestination: (path: string) => void
 }
@@ -40,6 +41,7 @@ export function useArchiveActions({
   desktopShell,
   refreshHistory,
   extractDestinationMode,
+  deleteAfterExtraction,
   lastExtractDestination,
   onRememberExtractDestination,
 }: UseArchiveActionsOptions) {
@@ -182,6 +184,10 @@ export function useArchiveActions({
 
     if (includeSelection && extractSelectedEntries.length > 0) {
       request.selectedEntries = extractSelectedEntries
+    }
+
+    if (deleteAfterExtraction) {
+      request.deleteAfterExtraction = true
     }
 
     return request

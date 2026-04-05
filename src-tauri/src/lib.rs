@@ -80,7 +80,7 @@ mod tests {
         extract_xz_archive, extract_zip_archive, normalize_archive_path,
         prepare_extract_destination, preview_archive, resolve_archive_output_path,
     };
-    use super::models::ConflictPolicy;
+    use super::models::{ConflictPolicy, ExtractRequest};
     use super::test_fixtures::{RAR4_SAVE_TXT, RAR5_SAVE_TXT, TEXT_TXT};
     use std::{
         fs,
@@ -250,6 +250,29 @@ mod tests {
                 .expect("read extracted encrypted zip file"),
             "encrypted zip content"
         );
+    }
+
+    #[test]
+    fn extract_request_defaults_delete_after_extraction_to_false() {
+        let request: ExtractRequest = serde_json::from_value(serde_json::json!({
+            "archivePath": "/tmp/archive.zip",
+            "destinationDirectory": "/tmp/output"
+        }))
+        .expect("deserialize extract request");
+
+        assert!(!request.delete_after_extraction);
+    }
+
+    #[test]
+    fn extract_request_deserializes_delete_after_extraction_flag() {
+        let request: ExtractRequest = serde_json::from_value(serde_json::json!({
+            "archivePath": "/tmp/archive.zip",
+            "destinationDirectory": "/tmp/output",
+            "deleteAfterExtraction": true
+        }))
+        .expect("deserialize extract request");
+
+        assert!(request.delete_after_extraction);
     }
 
     #[test]

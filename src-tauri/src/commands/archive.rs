@@ -230,6 +230,7 @@ pub(crate) fn extract_archive(
     request: ExtractRequest,
 ) -> Result<ArchiveActionResult, String> {
     let archive_path = normalize_archive_path(&request.archive_path)?;
+    let delete_after_extraction = request.delete_after_extraction;
     let conflict_policy = ConflictPolicy::from_input(request.conflict_policy.as_deref())?;
     let password = normalize_password(request.password.as_deref());
     let selected_entries = request
@@ -384,7 +385,11 @@ pub(crate) fn extract_archive(
                 format: format.label().to_string(),
                 stage: "finalizing".to_string(),
                 status: "running".to_string(),
-                message: "Recording extraction in recent activity.".to_string(),
+                message: if delete_after_extraction {
+                    "Recording extraction and cleaning up the source archive.".to_string()
+                } else {
+                    "Recording extraction in recent activity.".to_string()
+                },
                 progress: 90,
                 source_summary: source_summary.clone(),
                 output_path: Some(path_to_string(&destination_directory)),
@@ -392,29 +397,47 @@ pub(crate) fn extract_archive(
             },
         );
 
+        let mut message = if selected_entries.is_empty() {
+            format!(
+                "Extracted {} archive into {}",
+                format.label(),
+                destination_directory.display()
+            )
+        } else {
+            format!(
+                "Extracted {} selected entr{} from {} archive into {}",
+                selected_entries.len(),
+                if selected_entries.len() == 1 {
+                    "y"
+                } else {
+                    "ies"
+                },
+                format.label(),
+                destination_directory.display()
+            )
+        };
+
+        if delete_after_extraction {
+            match fs::remove_file(&archive_path) {
+                Ok(()) => {
+                    message.push_str(". Removed the source archive.")
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    message.push_str(". Source archive was already missing.")
+                }
+                Err(error) => {
+                    message.push_str(&format!(
+                        ". Warning: extraction succeeded, but the source archive could not be removed: {error}"
+                    ))
+                }
+            }
+        }
+
         let result = ArchiveActionResult {
             operation: "extract",
             format: format.label(),
             output_path: path_to_string(&destination_directory),
-            message: if selected_entries.is_empty() {
-                format!(
-                    "Extracted {} archive into {}",
-                    format.label(),
-                    destination_directory.display()
-                )
-            } else {
-                format!(
-                    "Extracted {} selected entr{} from {} archive into {}",
-                    selected_entries.len(),
-                    if selected_entries.len() == 1 {
-                        "y"
-                    } else {
-                        "ies"
-                    },
-                    format.label(),
-                    destination_directory.display()
-                )
-            },
+            message,
         };
 
         append_archive_history(

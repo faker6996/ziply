@@ -187,7 +187,7 @@ export function SettingsScreen({
             <label className="settings-toggle">
               <div>
                 <strong>Delete archive after extraction</strong>
-                <p>UI preference only for now. Backend delete flow is not wired yet.</p>
+                <p>Remove the source archive after a successful extraction.</p>
               </div>
               <input
                 checked={preferences.deleteArchiveAfterExtraction}

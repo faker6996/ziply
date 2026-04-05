@@ -112,6 +112,7 @@ export interface ExtractArchiveRequest {
   conflictPolicy: ConflictPolicy
   password?: string
   selectedEntries?: string[]
+  deleteAfterExtraction?: boolean
 }
 
 export interface ArchivePreviewRequest {

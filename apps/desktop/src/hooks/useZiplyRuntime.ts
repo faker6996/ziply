@@ -94,6 +94,7 @@ export function useZiplyRuntime({
     desktopShell,
     refreshHistory,
     extractDestinationMode: preferences.extractDestinationMode,
+    deleteAfterExtraction: preferences.deleteArchiveAfterExtraction,
     lastExtractDestination: preferences.lastExtractDestination,
     onRememberExtractDestination,
   })

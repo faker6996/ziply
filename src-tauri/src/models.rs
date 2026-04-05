@@ -43,6 +43,8 @@ pub(crate) struct ExtractRequest {
     pub(crate) password: Option<String>,
     #[serde(default)]
     pub(crate) selected_entries: Vec<String>,
+    #[serde(default)]
+    pub(crate) delete_after_extraction: bool,
 }
 
 #[derive(Deserialize)]
