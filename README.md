@@ -19,15 +19,15 @@
 
 ## 📋 Supported Archive Formats
 
-| Format | Compress | Extract | Notes |
-|--------|----------|---------|-------|
-| ZIP | ✅ | ✅ | With deflate and AES encryption support |
-| TAR | ✅ | ✅ | Pure TAR format |
-| TAR.GZ | ✅ | ✅ | Gzip compressed |
-| TAR.XZ | ✅ | ✅ | XZ compressed |
-| GZ | ✅ | ✅ | Basic Gzip |
-| 7Z | ✅ | ✅ | Via sevenz-rust |
-| RAR | ❌ | ✅ | Requires external tool |
+| Format | Compress | Extract | Notes                                   |
+| ------ | -------- | ------- | --------------------------------------- |
+| ZIP    | ✅       | ✅      | With deflate and AES encryption support |
+| TAR    | ✅       | ✅      | Pure TAR format                         |
+| TAR.GZ | ✅       | ✅      | Gzip compressed                         |
+| TAR.XZ | ✅       | ✅      | XZ compressed                           |
+| GZ     | ✅       | ✅      | Basic Gzip                              |
+| 7Z     | ✅       | ✅      | Via sevenz-rust                         |
+| RAR    | ❌       | ✅      | Requires external tool                  |
 
 ## 🚀 Quick Start
 
@@ -129,12 +129,14 @@ npm run lint            # Run ESLint on frontend
 ## 📦 Dependencies
 
 ### Frontend
+
 - `@tauri-apps/api` - Tauri API client
 - `@tauri-apps/plugin-dialog` - Native dialogs
 - `react` & `react-dom` - UI framework
 - `typescript` - Type safety
 
 ### Backend
+
 - `tauri` - Desktop framework
 - `zip` - ZIP format handling
 - `tar` - TAR format handling
