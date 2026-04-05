@@ -28,14 +28,18 @@ Ship Ziply as a cross-platform desktop archive utility for macOS, Windows, and L
 - Done: live job status panel fed by backend archive events
 - Done: shell-open flow for archives and shell-driven extract intents
 - Done: installer-facing file associations plus Windows/Linux shell integration installers
-- Next: overwrite rules and conflict prompts
-- Next: drag and drop entry flow
+- Done: overwrite rules and conflict handling
+- Done: drag and drop entry flow
+- Done: archive preview before extraction
+- Done: batch queue for compress and extract jobs
 
 ### 3. Production hardening
 
 - In progress: progress reporting for long-running jobs
+- Done: password-protected 7z creation and password-based zip/7z extraction
+- Done: frontend recovery hints for common archive failures
+- Done: retry flow for failed batch jobs
 - In progress: cross-platform shell integration polish, especially Finder-specific integration on macOS
-- Next: password-protected archives
 - Next: better error classification and recovery guidance
 - Next: broader format coverage review across all three operating systems
 
@@ -43,4 +47,4 @@ Ship Ziply as a cross-platform desktop archive utility for macOS, Windows, and L
 
 1. Keep archive operations stable and persisted.
 2. Surface live backend job states while commands are running.
-3. Finish conflict handling and deepen native shell integration on each OS.
+3. Deepen native shell integration on each OS and improve extraction ergonomics.

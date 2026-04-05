@@ -5,7 +5,11 @@ import type {
   CompressArchiveRequest,
   ExtractArchiveRequest,
 } from '../app/types'
-import { inferArchiveFormatFromPath, summarizePathList } from '../app/utils'
+import {
+  inferArchiveFormatFromPath,
+  recoveryHintForArchiveError,
+  summarizePathList,
+} from '../app/utils'
 
 interface UseArchiveQueueOptions {
   desktopShell: boolean
@@ -50,6 +54,7 @@ export function useArchiveQueue({
                   ...item,
                   status: 'success',
                   message: result.message,
+                  recoveryHint: undefined,
                   outputPath: result.outputPath,
                   finishedAt: Date.now(),
                 }
@@ -67,6 +72,7 @@ export function useArchiveQueue({
                   ...item,
                   status: 'error',
                   message: detail,
+                  recoveryHint: recoveryHintForArchiveError(detail),
                   finishedAt: Date.now(),
                 }
               : item,
@@ -172,6 +178,25 @@ export function useArchiveQueue({
     })
   }
 
+  function retryQueueJob(jobId: string) {
+    startTransition(() => {
+      setQueueItems((currentItems) =>
+        currentItems.map((item) =>
+          item.id === jobId && item.status === 'error'
+            ? {
+                ...item,
+                status: 'queued',
+                message: 'Waiting for an available queue slot.',
+                recoveryHint: undefined,
+                startedAt: undefined,
+                finishedAt: undefined,
+              }
+            : item,
+        ),
+      )
+    })
+  }
+
   return {
     queueItems,
     activeQueueJobId: activeJob?.id ?? null,
@@ -179,5 +204,6 @@ export function useArchiveQueue({
     enqueueExtractJob,
     removeQueuedJob,
     clearFinishedQueue,
+    retryQueueJob,
   }
 }

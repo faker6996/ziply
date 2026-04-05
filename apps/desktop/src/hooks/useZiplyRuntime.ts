@@ -83,6 +83,7 @@ export function useZiplyRuntime() {
     enqueueExtractJob,
     removeQueuedJob,
     clearFinishedQueue,
+    retryQueueJob,
   } = useArchiveQueue({
     desktopShell,
     runCompressRequest,
@@ -265,6 +266,7 @@ export function useZiplyRuntime() {
     queueCurrentCompress,
     queueCurrentExtract,
     removeQueuedJob,
+    retryQueueJob,
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
   }

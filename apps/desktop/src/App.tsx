@@ -60,6 +60,7 @@ function App() {
     queueCurrentCompress,
     queueCurrentExtract,
     removeQueuedJob,
+    retryQueueJob,
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
   } = useZiplyRuntime()
@@ -171,6 +172,7 @@ function App() {
             void clearFinishedQueue()
           }}
           onRemoveQueuedJob={removeQueuedJob}
+          onRetryJob={retryQueueJob}
           queueItems={queueItems}
         />
 

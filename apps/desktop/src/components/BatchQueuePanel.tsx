@@ -9,12 +9,14 @@ interface BatchQueuePanelProps {
   queueItems: ArchiveQueueItem[]
   onClearFinished: () => void
   onRemoveQueuedJob: (jobId: string) => void
+  onRetryJob: (jobId: string) => void
 }
 
 export function BatchQueuePanel({
   queueItems,
   onClearFinished,
   onRemoveQueuedJob,
+  onRetryJob,
 }: BatchQueuePanelProps) {
   const queuedJobs = queueItems.filter((item) => item.status === 'queued')
   const finishedJobCount = queueItems.filter(
@@ -83,8 +85,22 @@ export function BatchQueuePanel({
                   </div>
                 </div>
                 <strong>{job.message}</strong>
+                {job.recoveryHint ? <p>{job.recoveryHint}</p> : null}
                 <p>{job.sourceSummary}</p>
                 <p className="job-path">{job.outputPath}</p>
+                {job.status === 'error' ? (
+                  <div className="queue-card__actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => {
+                        onRetryJob(job.id)
+                      }}
+                      type="button"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : null}
               </article>
             )
           })}
