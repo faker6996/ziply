@@ -1,22 +1,26 @@
-import { BatchQueuePanel } from './components/BatchQueuePanel'
-import { CompressForm } from './components/CompressForm'
-import { DropZonePanel } from './components/DropZonePanel'
-import { ExtractForm } from './components/ExtractForm'
-import { LiveJobsPanel } from './components/LiveJobsPanel'
-import { OverviewPanels } from './components/OverviewPanels'
-import { RecentOperationsPanel } from './components/RecentOperationsPanel'
-import { ShellIntegrationPanel } from './components/ShellIntegrationPanel'
+import { useEffect, useState } from 'react'
+import { AppSidebar, type AppSection } from './components/AppSidebar'
+import { HistoryScreen } from './components/HistoryScreen'
+import { SettingsScreen } from './components/SettingsScreen'
+import { WorkspaceScreen } from './components/WorkspaceScreen'
+import { useAppPreferences } from './hooks/useAppPreferences'
 import { useZiplyRuntime } from './hooks/useZiplyRuntime'
 
 function App() {
+  const [activeSection, setActiveSection] = useState<AppSection>('workspace')
+  const { preferences, setPreferences } = useAppPreferences()
+  const rememberExtractDestination = (path: string) => {
+    setPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      lastExtractDestination: path,
+    }))
+  }
+
   const {
-    overview,
-    capabilities,
     history,
     liveJobs,
     queueItems,
     shellIntegration,
-    runtimeStatus,
     compressSources,
     compressDestination,
     compressFormat,
@@ -47,7 +51,6 @@ function App() {
     setExtractDestination,
     setExtractConflictPolicy,
     setExtractPassword,
-    refreshHistory,
     refreshShellIntegration,
     clearHistory,
     clearFinishedQueue,
@@ -73,138 +76,125 @@ function App() {
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
     supportsSelectiveExtract,
-  } = useZiplyRuntime()
+  } = useZiplyRuntime({
+    preferences,
+    onRememberExtractDestination: rememberExtractDestination,
+  })
+
+  useEffect(() => {
+    setCompressFormat(preferences.defaultCompressFormat)
+  }, [preferences.defaultCompressFormat, setCompressFormat])
+
+  useEffect(() => {
+    setExtractConflictPolicy(preferences.extractConflictPolicy)
+  }, [preferences.extractConflictPolicy, setExtractConflictPolicy])
 
   return (
     <main className="app-shell">
-      <section className="hero-card">
-        <div className="hero-copy">
-          <p className="eyebrow">Archive workspace</p>
-          <h1>{overview.name}</h1>
-          <p className="tagline">{overview.tagline}</p>
-        </div>
+      <AppSidebar activeSection={activeSection} onSelectSection={setActiveSection} />
 
-        <div className="status-panel">
-          <span className={`status-dot status-dot--${runtimeStatus}`} />
-          <strong>
-            {runtimeStatus === 'loading'
-              ? 'Loading desktop runtime'
-              : runtimeStatus === 'error'
-                ? 'Using preview data'
-                : 'Desktop runtime connected'}
-          </strong>
-          <p>
-            Real native archive commands are live for zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, and 7z.
-          </p>
-        </div>
-      </section>
+      <section className="app-content">
+        {activeSection === 'workspace' ? (
+          <WorkspaceScreen
+            compressConflictPolicy={compressConflictPolicy}
+            compressDestination={compressDestination}
+            compressFeedback={compressFeedback}
+            compressFormat={compressFormat}
+            compressPassword={compressPassword}
+            compressSources={compressSources}
+            desktopShell={desktopShell}
+            dragDropState={dragDropState}
+            extractConflictPolicy={extractConflictPolicy}
+            extractDestination={extractDestination}
+            extractFeedback={extractFeedback}
+            extractPassword={extractPassword}
+            extractPreview={extractPreview}
+            extractPreviewError={extractPreviewError}
+            extractPreviewLimit={extractPreviewLimit}
+            extractPreviewStatus={extractPreviewStatus}
+            extractSelectedEntries={extractSelectedEntries}
+            extractSource={extractSource}
+            gzipSourceCount={gzipSourceCount}
+            liveJobs={liveJobs}
+            normalizedCompressSources={normalizedCompressSources}
+            onClearFinishedQueue={() => {
+              void clearFinishedQueue()
+            }}
+            onClearSelection={clearExtractSelection}
+            onCompressConflictPolicyChange={setCompressConflictPolicy}
+            onCompressDestinationChange={setCompressDestination}
+            onCompressFormatChange={setCompressFormat}
+            onCompressPasswordChange={setCompressPassword}
+            onCompressSourcesChange={setCompressSources}
+            onExtractConflictPolicyChange={setExtractConflictPolicy}
+            onExtractDestinationChange={(value) => {
+              setExtractDestination(value)
+              if (value.trim()) {
+                rememberExtractDestination(value)
+              }
+            }}
+            onExtractPasswordChange={setExtractPassword}
+            onExtractSourceChange={setExtractSource}
+            onLoadMoreEntries={loadMoreExtractPreview}
+            onPickCompressDestination={() => {
+              void pickCompressDestination()
+            }}
+            onPickCompressFiles={() => {
+              void pickCompressFiles()
+            }}
+            onPickCompressFolders={() => {
+              void pickCompressFolders()
+            }}
+            onPickExtractDestination={() => {
+              void pickExtractDestination()
+            }}
+            onPickExtractSource={() => {
+              void pickExtractSource()
+            }}
+            onQueueAllExtract={queueAllExtract}
+            onQueueCompress={queueCurrentCompress}
+            onQueueExtract={queueCurrentExtract}
+            onRemoveQueuedJob={removeQueuedJob}
+            onRetryQueueJob={retryQueueJob}
+            onRunCompress={runCompress}
+            onRunExtract={runExtract}
+            onRunExtractAll={runExtractAll}
+            onRunExtractSelected={runExtractSelected}
+            onSelectAllVisibleEntries={selectAllVisibleExtractEntries}
+            onToggleEntry={toggleExtractEntry}
+            queueItems={queueItems}
+            supportsPasswordOnCompress={supportsArchivePasswordOnCompress}
+            supportsPasswordOnExtract={supportsArchivePasswordOnExtract}
+            supportsSelectiveExtract={supportsSelectiveExtract}
+          />
+        ) : null}
 
-      <section className="detail-grid">
-        <DropZonePanel desktopShell={desktopShell} dragDropState={dragDropState} />
-      </section>
+        {activeSection === 'history' ? (
+          <HistoryScreen
+            desktopShell={desktopShell}
+            history={history}
+            liveJobs={liveJobs}
+            onClear={() => {
+              void clearHistory()
+            }}
+          />
+        ) : null}
 
-      <section className="grid grid--tools">
-        <CompressForm
-          compressDestination={compressDestination}
-          compressFormat={compressFormat}
-          compressConflictPolicy={compressConflictPolicy}
-          compressPassword={compressPassword}
-          compressSources={compressSources}
-          desktopShell={desktopShell}
-          feedback={compressFeedback}
-          gzipSourceCount={gzipSourceCount}
-          normalizedCompressSources={normalizedCompressSources}
-          onCompressDestinationChange={setCompressDestination}
-          onCompressFormatChange={setCompressFormat}
-          onCompressConflictPolicyChange={setCompressConflictPolicy}
-          onCompressPasswordChange={setCompressPassword}
-          onCompressSourcesChange={setCompressSources}
-          onPickCompressDestination={() => {
-            void pickCompressDestination()
-          }}
-          onPickCompressFiles={() => {
-            void pickCompressFiles()
-          }}
-          onPickCompressFolders={() => {
-            void pickCompressFolders()
-          }}
-          supportsPasswordOnCompress={supportsArchivePasswordOnCompress}
-          onQueue={queueCurrentCompress}
-          onSubmit={runCompress}
-        />
-
-        <ExtractForm
-          desktopShell={desktopShell}
-          extractDestination={extractDestination}
-          extractConflictPolicy={extractConflictPolicy}
-          extractPassword={extractPassword}
-          extractSource={extractSource}
-          feedback={extractFeedback}
-          preview={extractPreview}
-          previewError={extractPreviewError}
-          previewLimit={extractPreviewLimit}
-          previewStatus={extractPreviewStatus}
-          selectedEntries={extractSelectedEntries}
-          onExtractConflictPolicyChange={setExtractConflictPolicy}
-          onExtractPasswordChange={setExtractPassword}
-          onExtractDestinationChange={setExtractDestination}
-          onExtractSourceChange={setExtractSource}
-          onPickExtractDestination={() => {
-            void pickExtractDestination()
-          }}
-          onPickExtractSource={() => {
-            void pickExtractSource()
-          }}
-          onToggleEntry={toggleExtractEntry}
-          onSelectAllVisibleEntries={selectAllVisibleExtractEntries}
-          onClearSelection={clearExtractSelection}
-          onLoadMoreEntries={loadMoreExtractPreview}
-          supportsPasswordOnExtract={supportsArchivePasswordOnExtract}
-          supportsSelectiveExtract={supportsSelectiveExtract}
-          onQueue={queueCurrentExtract}
-          onQueueAll={queueAllExtract}
-          onSubmit={runExtract}
-          onSubmitAll={runExtractAll}
-          onSubmitSelected={runExtractSelected}
-        />
-      </section>
-
-      <section className="detail-grid">
-        <OverviewPanels capabilities={capabilities} overview={overview} />
-
-        <ShellIntegrationPanel
-          desktopShell={desktopShell}
-          feedback={shellIntegrationFeedback}
-          onInstall={() => {
-            void installShellIntegration()
-          }}
-          onRefresh={() => {
-            void refreshShellIntegration()
-          }}
-          shellIntegration={shellIntegration}
-        />
-
-        <LiveJobsPanel liveJobs={liveJobs} />
-
-        <BatchQueuePanel
-          onClearFinished={() => {
-            void clearFinishedQueue()
-          }}
-          onRemoveQueuedJob={removeQueuedJob}
-          onRetryJob={retryQueueJob}
-          queueItems={queueItems}
-        />
-
-        <RecentOperationsPanel
-          desktopShell={desktopShell}
-          history={history}
-          onClear={() => {
-            void clearHistory()
-          }}
-          onRefresh={() => {
-            void refreshHistory()
-          }}
-        />
+        {activeSection === 'settings' ? (
+          <SettingsScreen
+            desktopShell={desktopShell}
+            onInstallShellIntegration={() => {
+              void installShellIntegration()
+            }}
+            onPreferencesChange={setPreferences}
+            onRefreshShellIntegration={() => {
+              void refreshShellIntegration()
+            }}
+            preferences={preferences}
+            shellIntegration={shellIntegration}
+            shellIntegrationFeedback={shellIntegrationFeedback}
+          />
+        ) : null}
       </section>
     </main>
   )

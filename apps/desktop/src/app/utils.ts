@@ -51,6 +51,28 @@ export function formatHistoryTimestamp(timestampMs: number) {
   }).format(new Date(timestampMs))
 }
 
+export function formatRelativeTimestamp(timestampMs: number) {
+  const diffMs = timestampMs - Date.now()
+  const diffMinutes = Math.round(diffMs / (60 * 1000))
+  const diffHours = Math.round(diffMs / (60 * 60 * 1000))
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000))
+  const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+
+  if (Math.abs(diffMinutes) < 60) {
+    return relativeFormatter.format(diffMinutes, 'minute')
+  }
+
+  if (Math.abs(diffHours) < 24) {
+    return relativeFormatter.format(diffHours, 'hour')
+  }
+
+  if (Math.abs(diffDays) < 7) {
+    return relativeFormatter.format(diffDays, 'day')
+  }
+
+  return formatHistoryTimestamp(timestampMs)
+}
+
 export function upsertLiveJob(currentJobs: ArchiveJobEvent[], nextJob: ArchiveJobEvent) {
   return [nextJob, ...currentJobs.filter((job) => job.jobId !== nextJob.jobId)]
     .sort((left, right) => right.timestampMs - left.timestampMs)

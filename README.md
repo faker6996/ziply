@@ -29,7 +29,7 @@ If a format is not implemented natively inside this repository, it stays out of 
 - Track live job state and persist recent operations locally
 - Handle destination conflicts with `keep both`, `overwrite`, or `stop`
 - Accept drag and drop for files, folders, and archives
-- Support password flows for encrypted `7z` creation and password-protected `zip` / `7z` extraction
+- Support password flows for encrypted `7z` and password-protected `zip` creation, plus password-protected `zip` / `7z` / `rar5` extraction
 
 ## Product Direction
 
@@ -90,7 +90,7 @@ The current native archive test suite covers:
 - password success and wrong-password failure paths for `7z`
 - unsafe ZIP path rejection during extraction
 
-Compatibility fixtures are generated locally by script and are not committed to git:
+Compatibility fixtures are tracked in the repository and can be regenerated locally by script:
 
 - `bash scripts/generate-compat-fixtures.sh`
 
@@ -100,6 +100,7 @@ Compatibility fixtures are generated locally by script and are not committed to 
 - Create password-protected `zip` archives
 - Extract password-protected `7z` archives
 - Extract password-protected `zip` archives, including AES-backed ZIPs
+- Extract password-protected `rar5` archives on the native read-side path
 
 ### Conflict handling
 
@@ -184,7 +185,7 @@ bash scripts/generate-compat-fixtures.sh
 
 ### Homebrew
 
-Once the Homebrew tap release flow is configured and published:
+Current install flow:
 
 ```bash
 brew tap faker6996/tap
@@ -193,7 +194,7 @@ brew install --cask faker6996/tap/ziply
 
 ### APT
 
-Once the APT repository and signing flow are configured and published:
+Current repository feed:
 
 ```bash
 curl -fsSL https://faker6996.github.io/ziply/apt/ziply-archive-keyring.asc | sudo gpg --dearmor -o /usr/share/keyrings/ziply-archive-keyring.gpg
@@ -228,7 +229,8 @@ ziply/
 │   ├── src/models.rs         # request and response models
 │   ├── src/shell.rs          # OS shell integration helpers
 │   ├── src/commands/         # Tauri command layer
-│   └── tests/fixtures/compat # generated local compatibility archives from system tools (gitignored)
+│   ├── tests/fixtures/compat # tracked compatibility archives generated from external tools
+│   └── fixtures/rar          # tracked native RAR fixtures for extract, preview, multipart, and password coverage
 ├── packaging/homebrew/       # Homebrew cask templates and tap skeleton
 ├── scripts/                  # release, version, and fixture-generation helper scripts
 └── .github/workflows/        # CI and release automation
@@ -288,7 +290,7 @@ Current local status:
 
 - `npm run lint` passes
 - `npm run build:web` passes
-- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `38` tests
+- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `45` tests
 - `bash scripts/check-version-consistency.sh` passes
 - compatibility fixtures can be regenerated locally with `bash scripts/generate-compat-fixtures.sh`
 
@@ -297,4 +299,3 @@ For the full native-only roadmap and promotion rules for new formats, see [PLAN.
 ## License
 
 MIT. See [LICENSE](/Users/tran_van_bach/Desktop/project/ziply/LICENSE).
-- Extract password-protected `rar` archives on the native RAR5 path with password-check validation before files are copied into the final destination

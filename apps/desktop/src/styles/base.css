@@ -1,10 +1,7 @@
 :root {
   font-family: "Manrope", "Avenir Next", "Segoe UI Variable", sans-serif;
-  color: #f5f2ea;
-  background:
-    radial-gradient(circle at top left, rgba(254, 177, 68, 0.24), transparent 28%),
-    radial-gradient(circle at right 20%, rgba(79, 140, 255, 0.22), transparent 26%),
-    linear-gradient(160deg, #0f1720 0%, #152335 46%, #1d3045 100%);
+  color: #f5f5f7;
+  background: #0b0b0d;
   line-height: 1.5;
   font-weight: 500;
   font-synthesis: none;
@@ -26,6 +23,7 @@ body,
 
 body {
   min-height: 100vh;
+  background: #0b0b0d;
 }
 
 button,
@@ -35,8 +33,23 @@ select {
   font: inherit;
 }
 
+button,
+input,
+select,
+textarea {
+  appearance: none;
+}
+
+button {
+  user-select: none;
+}
+
 ul {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+a {
+  color: inherit;
 }

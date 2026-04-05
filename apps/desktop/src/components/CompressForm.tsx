@@ -54,7 +54,7 @@ export function CompressForm({
       <div className="tool-card__header">
         <div>
           <p className="card-label">Compress</p>
-          <h2>Build an archive from files and folders.</h2>
+          <h2>Create an archive.</h2>
         </div>
         <div className="button-row">
           <button
@@ -87,7 +87,7 @@ export function CompressForm({
           rows={6}
           value={compressSources}
         />
-        <small>Enter one path per line. Mix files and folders as needed.</small>
+        <small>One path per line. Files and folders can be mixed.</small>
       </label>
 
       <div className="field-grid">
@@ -169,9 +169,9 @@ export function CompressForm({
         <small>
           {supportsPasswordOnCompress(compressFormat)
             ? compressFormat === '7z'
-              ? '7z archives can be encrypted with AES-256 when a password is set.'
-              : 'ZIP archives can be created with a password. Use 7z when you want the stronger encryption option.'
-            : 'Password-protected archive creation is currently available for zip and 7z only.'}
+              ? '7z uses the stronger encryption path already shipped in Ziply.'
+              : 'ZIP password creation is supported. Use 7z when you want stronger encryption.'
+            : 'Password creation is currently available for zip and 7z only.'}
         </small>
       </label>
 

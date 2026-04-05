@@ -37,13 +37,13 @@ For Ziply, the practical rule is:
 - `bz2`
 - `gz`
 - `7z`
-- `rar` extraction
+- `rar` read-side support
 
 ### Native-only product decisions already applied
 
 - `rar` external-tool bridge removed
-- `rar` reintroduced as native extract and preview support
-- `rar` shell/file association claims only cover extraction
+- `rar` reintroduced as native extract, preview, and selective extract support
+- `rar` shell/file association claims only cover opening and extraction paths, not creation
 - UI and README updated to stop overclaiming external-tool support
 
 ## Native-Only Milestones
@@ -140,13 +140,11 @@ Current shipped state:
 - older RAR4 fixtures currently fail cleanly but are not treated as broad support
 - `rar` archive creation is not shipped because the current native stack is read-side only
 
-Requirements before `RAR` can be treated as broadly complete:
+Remaining gaps before `RAR` can be treated as full format parity with `zip` and `7z`:
 
 - no dependence on external CLI tools or installed archive apps
 - acceptable legal and licensing posture
 - broader fixture coverage beyond the current RAR5 path
-- preview strategy defined
-- selective extract strategy broadened beyond the current extraction-through-temp approach when needed
 - UI and docs continue to distinguish extract-only support from full format parity
 - a native writer must exist before `rar` can move beyond extract-side parity
 
@@ -208,4 +206,4 @@ A format is `supported` only when all of the following are true:
 1. Keep the codebase native-only and remove any future archive bridge shortcuts.
 2. Harden the current native formats with more compatibility and regression tests.
 3. Add the next native formats one by one, only after backend quality is real.
-4. Treat `RAR` as extract-only until broader native support is proven, not assumed.
+4. Keep `RAR` documented as read-side support until a native writer exists.

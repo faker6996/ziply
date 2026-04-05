@@ -14,8 +14,17 @@ import { useArchiveHistory } from './useArchiveHistory'
 import { useDesktopDragDrop } from './useDesktopDragDrop'
 import { useLiveJobs } from './useLiveJobs'
 import { useShellIntegration } from './useShellIntegration'
+import type { AppPreferences } from '../components/SettingsScreen'
 
-export function useZiplyRuntime() {
+interface UseZiplyRuntimeOptions {
+  preferences: AppPreferences
+  onRememberExtractDestination: (path: string) => void
+}
+
+export function useZiplyRuntime({
+  preferences,
+  onRememberExtractDestination,
+}: UseZiplyRuntimeOptions) {
   const [overview, setOverview] = useState(fallbackOverview)
   const [capabilities, setCapabilities] = useState(fallbackCapabilities)
   const [runtimeStatus, setRuntimeStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -84,6 +93,9 @@ export function useZiplyRuntime() {
   } = useArchiveActions({
     desktopShell,
     refreshHistory,
+    extractDestinationMode: preferences.extractDestinationMode,
+    lastExtractDestination: preferences.lastExtractDestination,
+    onRememberExtractDestination,
   })
   const {
     queueItems,

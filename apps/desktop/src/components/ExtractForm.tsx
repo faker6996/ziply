@@ -83,7 +83,7 @@ export function ExtractForm({
       <div className="tool-card__header">
         <div>
           <p className="card-label">Extract</p>
-          <h2>Unpack an archive into a destination folder.</h2>
+          <h2>Extract an archive.</h2>
         </div>
       </div>
 
@@ -131,9 +131,9 @@ export function ExtractForm({
             Browse
           </button>
         </div>
-        <small>Supported now: zip, tar, tar.gz, tgz, tar.bz2, tbz2, tar.xz, txz, xz, bz2, gz, 7z, and rar extraction.</small>
+        <small>Supports zip, tar, tar.gz, tar.bz2, tar.xz, xz, bz2, gz, 7z, and rar read-side extraction.</small>
         <small>
-          RAR currently ships with native extract, preview, and selective extract, including multipart and password-protected RAR5 coverage. Ziply also routes `.part2.rar` and `.r00` style entries back to the first volume automatically. RAR creation is still out of scope for the current native stack.
+          RAR includes native preview, selective extract, password-protected RAR5 handling, and multipart routing back to the first volume.
         </small>
       </label>
 
@@ -173,7 +173,7 @@ export function ExtractForm({
         />
         <small>
           {supportsPasswordOnExtract(extractSource)
-            ? 'Use this for password-protected zip, 7z, and rar archives. Ziply reuses the same password whenever preview or extraction needs it.'
+            ? 'Use this for password-protected zip, 7z, and rar archives.'
             : 'Password-based extraction is currently supported for zip, 7z, and rar archives only.'}
         </small>
       </label>
@@ -187,7 +187,7 @@ export function ExtractForm({
                 ? 'Inspecting archive contents...'
                 : preview
                   ? `${preview.totalEntries} entries detected`
-                  : 'Choose an archive to inspect its contents before extraction.'}
+                  : 'Choose an archive to inspect before extraction.'}
             </small>
           </div>
           {preview ? (

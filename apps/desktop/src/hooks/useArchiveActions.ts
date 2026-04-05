@@ -29,6 +29,9 @@ import {
 interface UseArchiveActionsOptions {
   desktopShell: boolean
   refreshHistory: () => Promise<void>
+  extractDestinationMode: 'askEveryTime' | 'archiveFolder' | 'rememberLast'
+  lastExtractDestination: string
+  onRememberExtractDestination: (path: string) => void
 }
 
 const EXTRACT_PREVIEW_PAGE_SIZE = 160
@@ -36,6 +39,9 @@ const EXTRACT_PREVIEW_PAGE_SIZE = 160
 export function useArchiveActions({
   desktopShell,
   refreshHistory,
+  extractDestinationMode,
+  lastExtractDestination,
+  onRememberExtractDestination,
 }: UseArchiveActionsOptions) {
   const [compressSources, setCompressSources] = useState('')
   const [compressDestination, setCompressDestination] = useState('')
@@ -57,6 +63,23 @@ export function useArchiveActions({
 
   const normalizedCompressSources = normalizePaths(compressSources)
   const gzipSourceCount = compressFormat === 'gz' ? normalizedCompressSources.length : 0
+
+  function suggestPreferredExtractDestination(archivePath: string, extractHere: boolean) {
+    if (extractHere) {
+      return suggestExtractDestination(archivePath, true)
+    }
+
+    if (extractDestinationMode === 'rememberLast' && lastExtractDestination.trim()) {
+      return lastExtractDestination.trim()
+    }
+
+    if (extractDestinationMode === 'archiveFolder') {
+      return suggestExtractDestination(archivePath, true)
+    }
+
+    return suggestExtractDestination(archivePath, false)
+  }
+
   const loadArchivePreview = useEffectEvent(async (archivePath: string) => {
     if (!desktopShell) {
       startTransition(() => {
@@ -200,6 +223,7 @@ export function useArchiveActions({
           })
         })
       }
+      onRememberExtractDestination(request.destinationDirectory)
       void refreshHistory()
       return result
     } catch (error) {
@@ -288,7 +312,7 @@ export function useArchiveActions({
     }
 
     const destinationDirectory =
-      intent.destinationPath?.trim() || suggestExtractDestination(archivePath, intent.autoRun)
+      intent.destinationPath?.trim() || suggestPreferredExtractDestination(archivePath, intent.autoRun)
 
     startTransition(() => {
       setExtractSource(archivePath)
@@ -324,7 +348,7 @@ export function useArchiveActions({
 
     if (normalizedPaths.length === 1 && isArchivePath(normalizedPaths[0])) {
       const archivePath = normalizedPaths[0]
-      const destinationDirectory = suggestExtractDestination(archivePath, false)
+      const destinationDirectory = suggestPreferredExtractDestination(archivePath, false)
 
       startTransition(() => {
         setExtractSource(archivePath)
@@ -409,6 +433,7 @@ export function useArchiveActions({
 
     if (typeof selection === 'string') {
       setExtractSource(selection)
+      setExtractDestination(suggestPreferredExtractDestination(selection, false))
     }
   }
 
@@ -424,6 +449,7 @@ export function useArchiveActions({
 
     if (typeof selection === 'string') {
       setExtractDestination(selection)
+      onRememberExtractDestination(selection)
     }
   }
 
