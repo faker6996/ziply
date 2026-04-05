@@ -102,7 +102,8 @@ mod tests {
         create_zip_archive(&[source_directory.clone()], &archive_path).expect("create zip archive");
 
         let extract_directory = workspace.join("extract");
-        extract_zip_archive(&archive_path, &extract_directory, None).expect("extract zip archive");
+        extract_zip_archive(&archive_path, &extract_directory, None, None)
+            .expect("extract zip archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("source/docs/readme.txt"))
@@ -128,7 +129,8 @@ mod tests {
             .expect("create tar.gz archive");
 
         let extract_directory = workspace.join("extract");
-        extract_tar_gz_archive(&archive_path, &extract_directory).expect("extract tar.gz archive");
+        extract_tar_gz_archive(&archive_path, &extract_directory, None)
+            .expect("extract tar.gz archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("source/images/logo.txt"))
@@ -149,7 +151,8 @@ mod tests {
             .expect("create tar.xz archive");
 
         let extract_directory = workspace.join("extract");
-        extract_tar_xz_archive(&archive_path, &extract_directory).expect("extract tar.xz archive");
+        extract_tar_xz_archive(&archive_path, &extract_directory, None)
+            .expect("extract tar.xz archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("source/images/logo.txt"))
@@ -190,7 +193,8 @@ mod tests {
             .expect("create 7z archive");
 
         let extract_directory = workspace.join("extract");
-        extract_7z_archive(&archive_path, &extract_directory, None).expect("extract 7z archive");
+        extract_7z_archive(&archive_path, &extract_directory, None, None)
+            .expect("extract 7z archive");
 
         assert_eq!(
             fs::read_to_string(extract_directory.join("reports/q1.txt"))
@@ -300,7 +304,7 @@ mod tests {
             .any(|entry| entry.path.ends_with("secure/plan.txt")));
 
         let extract_directory = workspace.join("extract");
-        extract_7z_archive(&archive_path, &extract_directory, Some("ziply-secret"))
+        extract_7z_archive(&archive_path, &extract_directory, Some("ziply-secret"), None)
             .expect("extract encrypted 7z archive");
 
         assert_eq!(
@@ -308,5 +312,78 @@ mod tests {
                 .expect("read extracted encrypted 7z file"),
             "encrypted 7z content"
         );
+    }
+
+    #[test]
+    fn zip_selective_extract_only_unpacks_selected_entries() {
+        let workspace = unique_temp_dir("zip-selective-extract");
+        let source_directory = workspace.join("source");
+        write_file(&source_directory.join("docs/readme.txt"), "keep me");
+        write_file(&source_directory.join("docs/guide.txt"), "skip me");
+        write_file(&source_directory.join("notes.txt"), "skip me too");
+
+        let archive_path = workspace.join("bundle.zip");
+        create_zip_archive(&[source_directory.clone()], &archive_path).expect("create zip archive");
+
+        let extract_directory = workspace.join("extract");
+        extract_zip_archive(
+            &archive_path,
+            &extract_directory,
+            None,
+            Some(&["source/docs/readme.txt".to_string()]),
+        )
+        .expect("extract selected zip entry");
+
+        assert!(extract_directory.join("source/docs/readme.txt").exists());
+        assert!(!extract_directory.join("source/docs/guide.txt").exists());
+        assert!(!extract_directory.join("source/notes.txt").exists());
+    }
+
+    #[test]
+    fn tar_gz_selective_extract_only_unpacks_selected_directory() {
+        let workspace = unique_temp_dir("tar-gz-selective-extract");
+        let source_directory = workspace.join("source");
+        write_file(&source_directory.join("images/logo.txt"), "keep tree");
+        write_file(&source_directory.join("images/banner.txt"), "keep tree too");
+        write_file(&source_directory.join("notes.txt"), "skip file");
+
+        let archive_path = workspace.join("bundle.tar.gz");
+        create_tar_gz_archive(&[source_directory.clone()], &archive_path)
+            .expect("create tar.gz archive");
+
+        let extract_directory = workspace.join("extract");
+        extract_tar_gz_archive(
+            &archive_path,
+            &extract_directory,
+            Some(&["source/images".to_string()]),
+        )
+        .expect("extract selected tar.gz directory");
+
+        assert!(extract_directory.join("source/images/logo.txt").exists());
+        assert!(extract_directory.join("source/images/banner.txt").exists());
+        assert!(!extract_directory.join("source/notes.txt").exists());
+    }
+
+    #[test]
+    fn seven_zip_selective_extract_only_unpacks_selected_entries() {
+        let workspace = unique_temp_dir("seven-zip-selective-extract");
+        let source_directory = workspace.join("source");
+        write_file(&source_directory.join("reports/q1.txt"), "keep me");
+        write_file(&source_directory.join("reports/q2.txt"), "skip me");
+
+        let archive_path = workspace.join("bundle.7z");
+        create_7z_archive(&[source_directory], &archive_path, None).expect("create 7z archive");
+
+        let extract_directory = workspace.join("extract");
+        extract_7z_archive(
+            &archive_path,
+            &extract_directory,
+            None,
+            Some(&["reports/q1.txt".to_string()]),
+        )
+        .expect("extract selected 7z entry");
+
+        assert!(extract_directory.join("reports/q1.txt").exists());
+        assert!(!extract_directory.join("reports/q2.txt").exists());
     }
 }

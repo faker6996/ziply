@@ -5,6 +5,8 @@
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
+![CI](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/ci.yml?branch=main&label=ci)
+![Installers](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/build-installers.yml?branch=main&label=installers)
 
 ## ✨ Features
 
@@ -19,15 +21,15 @@
 
 ## 📋 Supported Archive Formats
 
-| Format | Compress | Extract | Notes                                   |
-| ------ | -------- | ------- | --------------------------------------- |
-| ZIP    | ✅       | ✅      | With deflate and AES encryption support |
-| TAR    | ✅       | ✅      | Pure TAR format                         |
-| TAR.GZ | ✅       | ✅      | Gzip compressed                         |
-| TAR.XZ | ✅       | ✅      | XZ compressed                           |
-| GZ     | ✅       | ✅      | Basic Gzip                              |
-| 7Z     | ✅       | ✅      | Via sevenz-rust                         |
-| RAR    | ❌       | ✅      | Requires external tool                  |
+| Format | Compress | Extract | Notes |
+| ------ | -------- | ------- | ----- |
+| ZIP    | ✅       | ✅      | Deflate compression. Password/AES support is extract-only right now |
+| TAR    | ✅       | ✅      | Pure TAR format |
+| TAR.GZ | ✅       | ✅      | Gzip compressed |
+| TAR.XZ | ✅       | ✅      | XZ compressed |
+| GZ     | ✅       | ✅      | Basic Gzip. Compression supports exactly one file |
+| 7Z     | ✅       | ✅      | Via sevenz-rust. Supports encrypted archive creation and extraction |
+| RAR    | ❌       | ✅      | Requires external tool such as `unar`, `7z`, `7zz`, or `unrar` |
 
 ## 🚀 Quick Start
 
@@ -49,6 +51,28 @@ npm run dev
 
 ```bash
 npm run build
+```
+
+## 📥 Package Installation
+
+### Homebrew
+
+After the Homebrew tap repository is configured, install Ziply with:
+
+```bash
+brew tap faker6996/tap
+brew install --cask faker6996/tap/ziply
+```
+
+### APT
+
+After GitHub Pages and APT signing secrets are configured, install Ziply with:
+
+```bash
+curl -fsSL https://faker6996.github.io/ziply/apt/ziply-archive-keyring.asc | sudo gpg --dearmor -o /usr/share/keyrings/ziply-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/ziply-archive-keyring.gpg] https://faker6996.github.io/ziply/apt stable main" | sudo tee /etc/apt/sources.list.d/ziply.list
+sudo apt update
+sudo apt install ziply
 ```
 
 ## 🛠️ Development
@@ -98,6 +122,25 @@ npm run build:web       # Build web assets only
 # Code Quality
 npm run lint            # Run ESLint on frontend
 ```
+
+## 🤖 GitHub Actions
+
+Ziply includes two main workflows under `.github/workflows`:
+
+- `ci.yml`: Runs frontend lint, web build, Rust format check, Rust tests, and `cargo check`
+- `build-installers.yml`: Builds installers on macOS, Windows, and Linux, auto-tags the version from `main`, publishes the GitHub Release, updates the Homebrew tap, and deploys the APT repository to GitHub Pages when the required secrets are configured
+
+### Required Secrets And Variables
+
+For package feeds to publish automatically, configure:
+
+- `HOMEBREW_TAP_TOKEN`
+- `APT_GPG_PRIVATE_KEY`
+- `APT_GPG_PASSPHRASE`
+- repository variable `HOMEBREW_TAP_REPOSITORY`
+- repository variable `HOMEBREW_TAP_BRANCH`
+
+Without those values, the workflow still builds installers and publishes the GitHub release, but skips Homebrew and APT publication.
 
 ## 📊 Development Status
 

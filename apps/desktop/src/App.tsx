@@ -31,6 +31,8 @@ function App() {
     extractPreview,
     extractPreviewStatus,
     extractPreviewError,
+    extractPreviewLimit,
+    extractSelectedEntries,
     shellIntegrationFeedback,
     dragDropState,
     desktopShell,
@@ -57,12 +59,20 @@ function App() {
     pickExtractDestination,
     runCompress,
     runExtract,
+    runExtractAll,
+    runExtractSelected,
     queueCurrentCompress,
     queueCurrentExtract,
+    queueAllExtract,
     removeQueuedJob,
     retryQueueJob,
+    toggleExtractEntry,
+    selectAllVisibleExtractEntries,
+    clearExtractSelection,
+    loadMoreExtractPreview,
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
+    supportsSelectiveExtract,
   } = useZiplyRuntime()
 
   return (
@@ -133,7 +143,9 @@ function App() {
           feedback={extractFeedback}
           preview={extractPreview}
           previewError={extractPreviewError}
+          previewLimit={extractPreviewLimit}
           previewStatus={extractPreviewStatus}
+          selectedEntries={extractSelectedEntries}
           onExtractConflictPolicyChange={setExtractConflictPolicy}
           onExtractPasswordChange={setExtractPassword}
           onExtractDestinationChange={setExtractDestination}
@@ -144,9 +156,17 @@ function App() {
           onPickExtractSource={() => {
             void pickExtractSource()
           }}
+          onToggleEntry={toggleExtractEntry}
+          onSelectAllVisibleEntries={selectAllVisibleExtractEntries}
+          onClearSelection={clearExtractSelection}
+          onLoadMoreEntries={loadMoreExtractPreview}
           supportsPasswordOnExtract={supportsArchivePasswordOnExtract}
+          supportsSelectiveExtract={supportsSelectiveExtract}
           onQueue={queueCurrentExtract}
+          onQueueAll={queueAllExtract}
           onSubmit={runExtract}
+          onSubmitAll={runExtractAll}
+          onSubmitSelected={runExtractSelected}
         />
       </section>
 

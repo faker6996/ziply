@@ -44,6 +44,8 @@ export function useZiplyRuntime() {
     extractPreview,
     extractPreviewStatus,
     extractPreviewError,
+    extractPreviewLimit,
+    extractSelectedEntries,
     normalizedCompressSources,
     gzipSourceCount,
     setCompressFeedback,
@@ -58,7 +60,7 @@ export function useZiplyRuntime() {
     setExtractFeedback,
     setExtractPassword,
     buildCompressRequest,
-    buildExtractRequest,
+    queueExtract,
     handleShellIntent,
     handleDroppedPaths,
     pickCompressFiles,
@@ -70,8 +72,15 @@ export function useZiplyRuntime() {
     runExtractRequest,
     runCompress,
     runExtract,
+    runExtractAll,
+    runExtractSelected,
+    toggleExtractEntry,
+    selectAllVisibleExtractEntries,
+    clearExtractSelection,
+    loadMoreExtractPreview,
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
+    supportsSelectiveExtract,
   } = useArchiveActions({
     desktopShell,
     refreshHistory,
@@ -200,7 +209,7 @@ export function useZiplyRuntime() {
       return
     }
 
-    const request = buildExtractRequest()
+    const request = queueExtract(true)
     const queuePosition = enqueueExtractJob(request)
 
     startTransition(() => {
@@ -210,6 +219,32 @@ export function useZiplyRuntime() {
           activeQueueJobId == null && queuePosition === 1
             ? 'Job added to the batch queue. It will start immediately.'
             : `Job added to the batch queue in position ${queuePosition}.`,
+        outputPath: request.destinationDirectory,
+      })
+    })
+  }
+
+  function queueAllExtract() {
+    if (!desktopShell) {
+      startTransition(() => {
+        setExtractFeedback({
+          status: 'error',
+          message: 'Archive operations run inside the Tauri desktop shell.',
+        })
+      })
+      return
+    }
+
+    const request = queueExtract(false)
+    const queuePosition = enqueueExtractJob(request)
+
+    startTransition(() => {
+      setExtractFeedback({
+        status: 'success',
+        message:
+          activeQueueJobId == null && queuePosition === 1
+            ? 'Full extract job added to the batch queue. It will start immediately.'
+            : `Full extract job added to the batch queue in position ${queuePosition}.`,
         outputPath: request.destinationDirectory,
       })
     })
@@ -237,6 +272,8 @@ export function useZiplyRuntime() {
     extractPreview,
     extractPreviewStatus,
     extractPreviewError,
+    extractPreviewLimit,
+    extractSelectedEntries,
     shellIntegrationFeedback,
     dragDropState,
     desktopShell,
@@ -263,11 +300,19 @@ export function useZiplyRuntime() {
     pickExtractDestination,
     runCompress,
     runExtract,
+    runExtractAll,
+    runExtractSelected,
     queueCurrentCompress,
     queueCurrentExtract,
+    queueAllExtract,
     removeQueuedJob,
     retryQueueJob,
+    toggleExtractEntry,
+    selectAllVisibleExtractEntries,
+    clearExtractSelection,
+    loadMoreExtractPreview,
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
+    supportsSelectiveExtract,
   }
 }

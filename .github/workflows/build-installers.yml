@@ -1,0 +1,398 @@
+name: Build Installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "*"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-installers:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS DMG
+            platform: macos-latest
+            build_args: "--bundles dmg --target universal-apple-darwin --ci --no-sign"
+            artifact_name: ziply-macos-dmg
+            artifact_path: target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          - name: Windows Setup EXE
+            platform: windows-latest
+            build_args: "--bundles nsis --ci --no-sign"
+            artifact_name: ziply-windows-setup
+            artifact_path: target/release/bundle/nsis/*.exe
+          - name: Linux DEB
+            platform: ubuntu-22.04
+            build_args: "--bundles deb --ci --no-sign"
+            artifact_name: ziply-linux-deb
+            artifact_path: target/release/bundle/deb/*.deb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Rust stable
+        if: matrix.platform != 'macos-latest'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust stable with universal Apple targets
+        if: matrix.platform == 'macos-latest'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Restore Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run build -- ${{ matrix.build_args }}
+
+      - name: Show bundle outputs
+        if: always()
+        shell: bash
+        run: find target -type f | sort | grep '/bundle/' || true
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+  tag-version:
+    name: Tag successful main build
+    runs-on: ubuntu-22.04
+    needs: build-installers
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.tag_result.outputs.created }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate app version
+        id: version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          CARGO_VERSION="$(awk '
+            /^\[package\]$/ { in_section = 1; next }
+            /^\[/ { if (in_section == 1) { exit } }
+            in_section && /^version = / {
+              gsub(/^version = "/, "", $0)
+              gsub(/"$/, "", $0)
+              print
+              exit
+            }
+          ' src-tauri/Cargo.toml)"
+
+          if [ -z "$PACKAGE_VERSION" ] || [ -z "$TAURI_VERSION" ] || [ -z "$CARGO_VERSION" ]; then
+            echo "Unable to determine one or more versions."
+            exit 1
+          fi
+
+          if [ "$PACKAGE_VERSION" != "$TAURI_VERSION" ] || [ "$PACKAGE_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Version mismatch detected."
+            echo "package.json: $PACKAGE_VERSION"
+            echo "src-tauri/tauri.conf.json: $TAURI_VERSION"
+            echo "src-tauri/Cargo.toml: $CARGO_VERSION"
+            exit 1
+          fi
+
+          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version tag already exists
+        id: tag_check
+        shell: bash
+        run: |
+          if git rev-parse -q --verify "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push version tag
+        if: steps.tag_check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Report existing version tag
+        if: steps.tag_check.outputs.exists == 'true'
+        run: echo "Tag ${{ steps.version.outputs.tag }} already exists. Skipping auto-tag."
+
+      - name: Record tag creation result
+        id: tag_result
+        shell: bash
+        run: |
+          if [ "${{ steps.tag_check.outputs.exists }}" = "false" ]; then
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-22.04
+    needs:
+      - build-installers
+      - tag-version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tag-version.outputs.tag != ''
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: ziply-macos-dmg
+          path: release-assets/macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: ziply-windows-setup
+          path: release-assets/windows
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: ziply-linux-deb
+          path: release-assets/linux
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          find release-assets -type f | sort > /tmp/release-files.txt
+          while IFS= read -r file; do
+            sha256sum "$file"
+          done < /tmp/release-files.txt > release-assets/SHA256SUMS.txt
+          cat release-assets/SHA256SUMS.txt
+
+      - name: Ensure GitHub CLI is available
+        shell: bash
+        run: |
+          if command -v gh >/dev/null 2>&1; then
+            gh --version
+            exit 0
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y gh
+          gh --version
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ needs.tag-version.outputs.tag }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" \
+              release-assets/macos/* \
+              release-assets/windows/* \
+              release-assets/linux/* \
+              release-assets/SHA256SUMS.txt \
+              --clobber
+            exit 0
+          fi
+
+          gh release create "$TAG_NAME" \
+            release-assets/macos/* \
+            release-assets/windows/* \
+            release-assets/linux/* \
+            release-assets/SHA256SUMS.txt \
+            --title "Ziply $TAG_NAME" \
+            --generate-notes
+
+  publish-homebrew-tap:
+    name: Publish Homebrew tap
+    runs-on: ubuntu-22.04
+    needs:
+      - build-installers
+      - publish-release
+      - tag-version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tag-version.outputs.tag != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Preflight secret check
+        id: preflight
+        shell: bash
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "HOMEBREW_TAP_TOKEN is not configured. Skipping Homebrew tap publish."
+            exit 0
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Download macOS artifact
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/download-artifact@v6
+        with:
+          name: ziply-macos-dmg
+          path: release-assets/macos
+
+      - name: Publish Homebrew tap
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
+          HOMEBREW_TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH }}
+          TAG_NAME: ${{ needs.tag-version.outputs.tag }}
+          VERSION: ${{ needs.tag-version.outputs.version }}
+        run: |
+          chmod +x scripts/publish-homebrew-tap.sh scripts/render-homebrew-cask.sh
+          export DMG_PATH="$(find release-assets/macos -type f -name '*.dmg' | head -n 1)"
+          if [ -z "$DMG_PATH" ]; then
+            echo "No .dmg artifact found."
+            exit 1
+          fi
+
+          scripts/publish-homebrew-tap.sh
+
+      - name: Skip notice
+        if: steps.preflight.outputs.ready != 'true'
+        run: echo "Homebrew tap publish skipped because HOMEBREW_TAP_TOKEN is not configured."
+
+  publish-apt-repo:
+    name: Publish APT repo to GitHub Pages
+    runs-on: ubuntu-22.04
+    needs:
+      - build-installers
+      - publish-release
+      - tag-version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tag-version.outputs.tag != ''
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Preflight secret check
+        id: preflight
+        shell: bash
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APT_GPG_PRIVATE_KEY" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "APT_GPG_PRIVATE_KEY is not configured. Skipping APT repo publish."
+            exit 0
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Download Linux artifact
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/download-artifact@v6
+        with:
+          name: ziply-linux-deb
+          path: release-assets/linux
+
+      - name: Install APT repo build dependencies
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Build APT repository
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+          APT_REPO_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt
+          APT_ORIGIN: Ziply
+          APT_LABEL: Ziply
+        run: |
+          chmod +x scripts/build-apt-repo.sh
+          DEB_PATH="$(find release-assets/linux -type f -name '*.deb' | head -n 1)"
+          if [ -z "$DEB_PATH" ]; then
+            echo "No .deb artifact found."
+            exit 1
+          fi
+
+          scripts/build-apt-repo.sh "$DEB_PATH" pages-site/apt
+
+      - name: Add root index
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: |
+          cat > pages-site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>Ziply Packages</title>
+            </head>
+            <body>
+              <h1>Ziply Packages</h1>
+              <ul>
+                <li><a href="./apt/">APT repository</a></li>
+              </ul>
+            </body>
+          </html>
+          EOF
+
+      - name: Configure Pages
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages-site
+
+      - name: Deploy to GitHub Pages
+        if: steps.preflight.outputs.ready == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Skip notice
+        if: steps.preflight.outputs.ready != 'true'
+        run: echo "APT repo publish skipped because signing secrets are not configured."

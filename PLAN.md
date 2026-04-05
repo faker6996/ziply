@@ -10,7 +10,7 @@ Ship Ziply as a cross-platform desktop archive utility for macOS, Windows, and L
 - Done: native support for `zip`, `tar`, `tar.gz`, `tar.xz`, `gz`, and `7z`
 - Done: extract-only `.rar` bridge when a compatible external tool exists
 - Done: dialog-based source and destination picking
-- In progress: beta UX and persistence layers
+- Done: beta UX, persistence, queueing, and preview-based extraction workflow
 
 ## Beta Milestones
 
@@ -31,20 +31,21 @@ Ship Ziply as a cross-platform desktop archive utility for macOS, Windows, and L
 - Done: overwrite rules and conflict handling
 - Done: drag and drop entry flow
 - Done: archive preview before extraction
+- Done: selective extract from previewed entries for zip, tar, tar.gz, tar.xz, and 7z
 - Done: batch queue for compress and extract jobs
 
 ### 3. Production hardening
 
-- In progress: progress reporting for long-running jobs
+- Done: phase-based progress reporting for live archive jobs
 - Done: password-protected 7z creation and password-based zip/7z extraction
 - Done: frontend recovery hints for common archive failures
 - Done: retry flow for failed batch jobs
-- In progress: cross-platform shell integration polish, especially Finder-specific integration on macOS
-- Next: better error classification and recovery guidance
-- Next: broader format coverage review across all three operating systems
+- Done: current cross-platform shell integration baseline with documented macOS `Open With Ziply` limitation
+- Done: better error classification and recovery guidance in frontend feedback
+- Done: broader format coverage review surfaced inside the app as a format support matrix
 
 ## Immediate Implementation Track
 
 1. Keep archive operations stable and persisted.
 2. Surface live backend job states while commands are running.
-3. Deepen native shell integration on each OS and improve extraction ergonomics.
+3. Keep polishing extraction ergonomics and platform integration as future product work, not as a blocker for v1.

@@ -21,6 +21,7 @@ import {
   suggestExtractDestination,
   supportsArchivePasswordOnCompress,
   supportsArchivePasswordOnExtract,
+  supportsSelectiveExtract,
   toDialogPaths,
   recoveryHintForArchiveError,
 } from '../app/utils'
@@ -29,6 +30,8 @@ interface UseArchiveActionsOptions {
   desktopShell: boolean
   refreshHistory: () => Promise<void>
 }
+
+const EXTRACT_PREVIEW_PAGE_SIZE = 160
 
 export function useArchiveActions({
   desktopShell,
@@ -49,6 +52,8 @@ export function useArchiveActions({
   const [extractPreviewStatus, setExtractPreviewStatus] =
     useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [extractPreviewError, setExtractPreviewError] = useState('')
+  const [extractSelectedEntries, setExtractSelectedEntries] = useState<string[]>([])
+  const [extractPreviewLimit, setExtractPreviewLimit] = useState(EXTRACT_PREVIEW_PAGE_SIZE)
 
   const normalizedCompressSources = normalizePaths(compressSources)
   const gzipSourceCount = compressFormat === 'gz' ? normalizedCompressSources.length : 0
@@ -80,6 +85,7 @@ export function useArchiveActions({
     try {
       const request: ArchivePreviewRequest = {
         archivePath: nextPath,
+        limit: extractPreviewLimit,
       }
       if (extractPassword) {
         request.password = extractPassword
@@ -103,7 +109,27 @@ export function useArchiveActions({
 
   useEffect(() => {
     void loadArchivePreview(extractSource)
-  }, [extractSource, extractPassword])
+  }, [extractSource, extractPassword, extractPreviewLimit])
+
+  useEffect(() => {
+    startTransition(() => {
+      setExtractSelectedEntries([])
+      setExtractPreviewLimit(EXTRACT_PREVIEW_PAGE_SIZE)
+    })
+  }, [extractSource])
+
+  useEffect(() => {
+    if (!extractPreview) {
+      return
+    }
+
+    const visibleEntries = new Set(extractPreview.visibleEntries.map((entry) => entry.path))
+    startTransition(() => {
+      setExtractSelectedEntries((currentEntries) =>
+        currentEntries.filter((entry) => visibleEntries.has(entry)),
+      )
+    })
+  }, [extractPreview])
 
   function buildCompressRequest(): CompressArchiveRequest {
     const request: CompressArchiveRequest = {
@@ -120,7 +146,7 @@ export function useArchiveActions({
     return request
   }
 
-  function buildExtractRequest(): ExtractArchiveRequest {
+  function buildExtractRequest(includeSelection = true): ExtractArchiveRequest {
     const request: ExtractArchiveRequest = {
       archivePath: extractSource.trim(),
       destinationDirectory: extractDestination.trim(),
@@ -129,6 +155,10 @@ export function useArchiveActions({
 
     if (extractPassword.trim()) {
       request.password = extractPassword.trim()
+    }
+
+    if (includeSelection && extractSelectedEntries.length > 0) {
+      request.selectedEntries = extractSelectedEntries
     }
 
     return request
@@ -407,6 +437,52 @@ export function useArchiveActions({
     await runExtractRequest(buildExtractRequest())
   }
 
+  async function runExtractAll(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
+    await runExtractRequest(buildExtractRequest(false))
+  }
+
+  async function runExtractSelected() {
+    await runExtractRequest(buildExtractRequest(true))
+  }
+
+  function toggleExtractEntry(path: string) {
+    startTransition(() => {
+      setExtractSelectedEntries((currentEntries) =>
+        currentEntries.includes(path)
+          ? currentEntries.filter((entry) => entry !== path)
+          : [...currentEntries, path],
+      )
+    })
+  }
+
+  function selectAllVisibleExtractEntries(paths?: string[]) {
+    const nextEntries = paths ?? extractPreview?.visibleEntries.map((entry) => entry.path)
+    if (!nextEntries) {
+      return
+    }
+
+    startTransition(() => {
+      setExtractSelectedEntries(nextEntries)
+    })
+  }
+
+  function clearExtractSelection() {
+    startTransition(() => {
+      setExtractSelectedEntries([])
+    })
+  }
+
+  function loadMoreExtractPreview() {
+    startTransition(() => {
+      setExtractPreviewLimit((currentLimit) => currentLimit + EXTRACT_PREVIEW_PAGE_SIZE)
+    })
+  }
+
+  function queueExtract(includeSelection = true) {
+    return buildExtractRequest(includeSelection)
+  }
+
   return {
     compressSources,
     compressDestination,
@@ -422,6 +498,8 @@ export function useArchiveActions({
     extractPreview,
     extractPreviewStatus,
     extractPreviewError,
+    extractPreviewLimit,
+    extractSelectedEntries,
     normalizedCompressSources,
     gzipSourceCount,
     setCompressFeedback,
@@ -437,6 +515,7 @@ export function useArchiveActions({
     setExtractPassword,
     buildCompressRequest,
     buildExtractRequest,
+    queueExtract,
     handleShellIntent,
     handleDroppedPaths,
     pickCompressFiles,
@@ -448,7 +527,14 @@ export function useArchiveActions({
     runExtractRequest,
     runCompress,
     runExtract,
+    runExtractAll,
+    runExtractSelected,
+    toggleExtractEntry,
+    selectAllVisibleExtractEntries,
+    clearExtractSelection,
+    loadMoreExtractPreview,
     supportsArchivePasswordOnCompress,
     supportsArchivePasswordOnExtract,
+    supportsSelectiveExtract,
   }
 }

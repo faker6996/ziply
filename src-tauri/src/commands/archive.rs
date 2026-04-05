@@ -219,17 +219,41 @@ pub(crate) fn extract_archive(
     let archive_path = normalize_archive_path(&request.archive_path)?;
     let conflict_policy = ConflictPolicy::from_input(request.conflict_policy.as_deref())?;
     let password = normalize_password(request.password.as_deref());
+    let selected_entries = request
+        .selected_entries
+        .into_iter()
+        .map(|entry| entry.trim().to_string())
+        .filter(|entry| !entry.is_empty())
+        .collect::<Vec<_>>();
     let destination_directory = prepare_extract_destination(
         &normalize_directory_path(&request.destination_directory)?,
         conflict_policy,
     )?;
     let format = ArchiveFormat::detect_from_archive_path(&archive_path)?;
     let job_id = archive_job_id();
-    let source_summary = path_to_string(&archive_path);
+    let source_summary = if selected_entries.is_empty() {
+        path_to_string(&archive_path)
+    } else {
+        format!(
+            "{} • {} selected entr{}",
+            path_to_string(&archive_path),
+            selected_entries.len(),
+            if selected_entries.len() == 1 { "y" } else { "ies" }
+        )
+    };
 
     if password.is_some() && !matches!(format, ArchiveFormat::Zip | ArchiveFormat::SevenZip) {
         return Err(
             "password-based extraction is currently supported for zip and 7z archives only."
+                .to_string(),
+        );
+    }
+
+    if !selected_entries.is_empty()
+        && matches!(format, ArchiveFormat::Gz | ArchiveFormat::Rar)
+    {
+        return Err(
+            "selective extraction is currently supported for zip, tar, tar.gz, tar.xz, and 7z archives only."
                 .to_string(),
         );
     }
@@ -285,14 +309,34 @@ pub(crate) fn extract_archive(
 
         match format {
             ArchiveFormat::Zip => {
-                extract_zip_archive(&archive_path, &destination_directory, password.as_deref())?
+                extract_zip_archive(
+                    &archive_path,
+                    &destination_directory,
+                    password.as_deref(),
+                    Some(&selected_entries),
+                )?
             }
-            ArchiveFormat::Tar => extract_tar_archive(&archive_path, &destination_directory)?,
-            ArchiveFormat::TarGz => extract_tar_gz_archive(&archive_path, &destination_directory)?,
-            ArchiveFormat::TarXz => extract_tar_xz_archive(&archive_path, &destination_directory)?,
+            ArchiveFormat::Tar => {
+                extract_tar_archive(&archive_path, &destination_directory, Some(&selected_entries))?
+            }
+            ArchiveFormat::TarGz => extract_tar_gz_archive(
+                &archive_path,
+                &destination_directory,
+                Some(&selected_entries),
+            )?,
+            ArchiveFormat::TarXz => extract_tar_xz_archive(
+                &archive_path,
+                &destination_directory,
+                Some(&selected_entries),
+            )?,
             ArchiveFormat::Gz => extract_gz_archive(&archive_path, &destination_directory)?,
             ArchiveFormat::SevenZip => {
-                extract_7z_archive(&archive_path, &destination_directory, password.as_deref())?
+                extract_7z_archive(
+                    &archive_path,
+                    &destination_directory,
+                    password.as_deref(),
+                    Some(&selected_entries),
+                )?
             }
             ArchiveFormat::Rar => extract_rar_archive(&archive_path, &destination_directory)?,
         }
@@ -317,11 +361,21 @@ pub(crate) fn extract_archive(
             operation: "extract",
             format: format.label(),
             output_path: path_to_string(&destination_directory),
-            message: format!(
-                "Extracted {} archive into {}",
-                format.label(),
-                destination_directory.display()
-            ),
+            message: if selected_entries.is_empty() {
+                format!(
+                    "Extracted {} archive into {}",
+                    format.label(),
+                    destination_directory.display()
+                )
+            } else {
+                format!(
+                    "Extracted {} selected entr{} from {} archive into {}",
+                    selected_entries.len(),
+                    if selected_entries.len() == 1 { "y" } else { "ies" },
+                    format.label(),
+                    destination_directory.display()
+                )
+            },
         };
 
         append_archive_history(
@@ -384,5 +438,6 @@ pub(crate) fn preview_archive_contents(
     request: ArchivePreviewRequest,
 ) -> Result<ArchivePreviewResult, String> {
     let archive_path = normalize_archive_path(&request.archive_path)?;
-    preview_archive(&archive_path, 160, request.password.as_deref())
+    let limit = request.limit.unwrap_or(160).max(1);
+    preview_archive(&archive_path, limit, request.password.as_deref())
 }

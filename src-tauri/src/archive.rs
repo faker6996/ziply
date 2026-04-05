@@ -424,12 +424,14 @@ pub(crate) fn extract_zip_archive(
     archive_path: &Path,
     destination_directory: &Path,
     password: Option<&str>,
+    selected_entries: Option<&[String]>,
 ) -> Result<(), String> {
     let file = File::open(archive_path)
         .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
     let mut archive =
         ZipArchive::new(file).map_err(|error| format!("failed to read zip archive: {error}"))?;
     let normalized_password = normalize_password(password);
+    let selected_entries = normalize_selected_entries(selected_entries);
 
     for index in 0..archive.len() {
         let mut entry = if let Some(password) = normalized_password.as_deref() {
@@ -446,6 +448,9 @@ pub(crate) fn extract_zip_archive(
         let relative_path = entry
             .enclosed_name()
             .ok_or_else(|| format!("zip entry contains an unsafe path: {}", entry.name()))?;
+        if !should_extract_entry(&relative_path.to_string_lossy(), selected_entries.as_deref()) {
+            continue;
+        }
         let output_path = destination_directory.join(relative_path);
 
         if entry.is_dir() {
@@ -487,40 +492,45 @@ pub(crate) fn extract_zip_archive(
 pub(crate) fn extract_tar_archive(
     archive_path: &Path,
     destination_directory: &Path,
+    selected_entries: Option<&[String]>,
 ) -> Result<(), String> {
     let file = File::open(archive_path)
         .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
     let reader = BufReader::new(file);
     let mut archive = tar::Archive::new(reader);
-    unpack_tar_entries(&mut archive, destination_directory)
+    unpack_tar_entries(&mut archive, destination_directory, selected_entries)
 }
 
 pub(crate) fn extract_tar_gz_archive(
     archive_path: &Path,
     destination_directory: &Path,
+    selected_entries: Option<&[String]>,
 ) -> Result<(), String> {
     let file = File::open(archive_path)
         .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
     let decoder = GzDecoder::new(BufReader::new(file));
     let mut archive = tar::Archive::new(decoder);
-    unpack_tar_entries(&mut archive, destination_directory)
+    unpack_tar_entries(&mut archive, destination_directory, selected_entries)
 }
 
 pub(crate) fn extract_tar_xz_archive(
     archive_path: &Path,
     destination_directory: &Path,
+    selected_entries: Option<&[String]>,
 ) -> Result<(), String> {
     let file = File::open(archive_path)
         .map_err(|error| format!("failed to open archive {}: {error}", archive_path.display()))?;
     let decoder = XzDecoder::new(BufReader::new(file));
     let mut archive = tar::Archive::new(decoder);
-    unpack_tar_entries(&mut archive, destination_directory)
+    unpack_tar_entries(&mut archive, destination_directory, selected_entries)
 }
 
 fn unpack_tar_entries<R: Read>(
     archive: &mut tar::Archive<R>,
     destination_directory: &Path,
+    selected_entries: Option<&[String]>,
 ) -> Result<(), String> {
+    let selected_entries = normalize_selected_entries(selected_entries);
     let entries = archive
         .entries()
         .map_err(|error| format!("failed to read tar archive entries: {error}"))?;
@@ -532,6 +542,9 @@ fn unpack_tar_entries<R: Read>(
             .path()
             .map_err(|error| format!("failed to read tar archive entry path: {error}"))?
             .into_owned();
+        if !should_extract_entry(&relative_path.to_string_lossy(), selected_entries.as_deref()) {
+            continue;
+        }
         let output_path = safe_join(destination_directory, &relative_path)?;
 
         if let Some(parent) = output_path.parent() {
@@ -590,18 +603,86 @@ pub(crate) fn extract_7z_archive(
     archive_path: &Path,
     destination_directory: &Path,
     password: Option<&str>,
+    selected_entries: Option<&[String]>,
 ) -> Result<(), String> {
-    if let Some(password) = normalize_password(password) {
-        decompress_file_with_password(
-            archive_path,
-            destination_directory,
-            Password::new(&password),
-        )
-        .map_err(|error| format!("failed to extract 7z archive: {error}"))
-    } else {
-        decompress_file(archive_path, destination_directory)
-            .map_err(|error| format!("failed to extract 7z archive: {error}"))
+    let password = normalize_password(password)
+        .map(|value| Password::new(&value))
+        .unwrap_or_else(Password::empty);
+    let selected_entries = normalize_selected_entries(selected_entries);
+
+    if selected_entries.is_none() {
+        return if password.is_empty() {
+            decompress_file(archive_path, destination_directory)
+                .map_err(|error| format!("failed to extract 7z archive: {error}"))
+        } else {
+            decompress_file_with_password(archive_path, destination_directory, password)
+                .map_err(|error| format!("failed to extract 7z archive: {error}"))
+        };
     }
+
+    let mut reader = ArchiveReader::open(archive_path, password)
+        .map_err(|error| format!("failed to read 7z archive: {error}"))?;
+    let selected_entries = selected_entries.expect("selection checked above");
+
+    reader
+        .for_each_entries(|entry, input| {
+            if !should_extract_entry(entry.name(), Some(&selected_entries)) {
+                return Ok(true);
+            }
+
+            let output_path = safe_join(destination_directory, Path::new(entry.name()))
+                .map_err(io::Error::other)?;
+
+            if entry.is_directory() {
+                fs::create_dir_all(&output_path)?;
+                return Ok(true);
+            }
+
+            if let Some(parent) = output_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            let output_file = File::create(&output_path)?;
+            let mut writer = BufWriter::new(output_file);
+            io::copy(input, &mut writer)?;
+            Ok(true)
+        })
+        .map_err(|error| format!("failed to extract 7z archive: {error}"))
+}
+
+fn normalize_selected_entries(selected_entries: Option<&[String]>) -> Option<Vec<String>> {
+    let selected_entries = selected_entries
+        .unwrap_or_default()
+        .iter()
+        .map(|entry| normalize_archive_entry_name(entry))
+        .filter(|entry| !entry.is_empty())
+        .collect::<Vec<_>>();
+
+    if selected_entries.is_empty() {
+        None
+    } else {
+        Some(selected_entries)
+    }
+}
+
+fn normalize_archive_entry_name(value: &str) -> String {
+    value
+        .trim()
+        .replace('\\', "/")
+        .trim_matches('/')
+        .to_string()
+}
+
+fn should_extract_entry(entry_path: &str, selected_entries: Option<&[String]>) -> bool {
+    let Some(selected_entries) = selected_entries else {
+        return true;
+    };
+
+    let normalized_entry = normalize_archive_entry_name(entry_path);
+    selected_entries.iter().any(|selected_entry| {
+        normalized_entry == *selected_entry
+            || normalized_entry.starts_with(&format!("{selected_entry}/"))
+    })
 }
 
 pub(crate) fn extract_rar_archive(

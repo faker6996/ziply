@@ -102,11 +102,13 @@ export interface ExtractArchiveRequest {
   destinationDirectory: string
   conflictPolicy: ConflictPolicy
   password?: string
+  selectedEntries?: string[]
 }
 
 export interface ArchivePreviewRequest {
   archivePath: string
   password?: string
+  limit?: number
 }
 
 interface BaseQueueItem {

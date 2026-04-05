@@ -179,6 +179,10 @@ export function supportsArchivePasswordOnExtract(path: string) {
   return /\.(zip|7z)$/i.test(path.trim())
 }
 
+export function supportsSelectiveExtract(path: string) {
+  return /\.(tar\.gz|tar\.xz|tgz|txz|zip|tar|7z)$/i.test(path.trim())
+}
+
 function pathSegments(path: string) {
   return path.trim().split(/[\\/]/).filter(Boolean)
 }
@@ -266,6 +270,10 @@ export function recoveryHintForArchiveError(message: string) {
 
   if (normalized.includes('password-based extraction is currently supported for zip and 7z archives only')) {
     return 'Remove the password for this archive type, or use a zip or 7z archive if encrypted extraction is required.'
+  }
+
+  if (normalized.includes('selective extraction is currently supported for zip, tar, tar.gz, tar.xz, and 7z archives only')) {
+    return 'Use full extraction for gz or rar archives. Selective extraction is available for zip, tar, tar.gz, tar.xz, and 7z.'
   }
 
   if (normalized.includes('destination archive already exists')) {

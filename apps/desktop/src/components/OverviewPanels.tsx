@@ -6,6 +6,38 @@ interface OverviewPanelsProps {
 }
 
 export function OverviewPanels({ overview, capabilities }: OverviewPanelsProps) {
+  const formatSupportRows = [
+    {
+      format: 'zip',
+      create: 'Yes',
+      extract: 'Yes',
+      notes: 'Deflate compression. Password/AES support is extract-only right now.',
+    },
+    { format: 'tar', create: 'Yes', extract: 'Yes', notes: 'Pure tar format.' },
+    { format: 'tar.gz', create: 'Yes', extract: 'Yes', notes: 'Gzip-compressed tar.' },
+    { format: 'tar.xz', create: 'Yes', extract: 'Yes', notes: 'XZ-compressed tar.' },
+    {
+      format: 'gz',
+      create: 'Yes',
+      extract: 'Yes',
+      notes: 'Basic gzip stream. Compression supports exactly one file.',
+    },
+    {
+      format: '7z',
+      create: 'Yes',
+      extract: 'Yes',
+      notes: 'Via sevenz-rust. Supports encrypted archive creation and extraction.',
+    },
+    {
+      format: 'rar',
+      create: 'No',
+      extract: 'Yes',
+      notes: capabilities.rarExtractionAvailable
+        ? `Requires external tool. ${capabilities.rarExtractorLabel} is available on this machine.`
+        : 'Requires external tool such as unar, 7z, 7zz, or unrar.',
+    },
+  ]
+
   return (
     <>
       <article className="panel-card">
@@ -64,6 +96,26 @@ export function OverviewPanels({ overview, capabilities }: OverviewPanelsProps) 
             <div className="focus-item" key={item}>
               <span className="focus-index" />
               <p>{item}</p>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="panel-card panel-card--wide">
+        <p className="card-label">Format matrix</p>
+        <div className="format-matrix">
+          <div className="format-matrix__row format-matrix__row--header">
+            <strong>Format</strong>
+            <strong>Compress</strong>
+            <strong>Extract</strong>
+            <strong>Notes</strong>
+          </div>
+          {formatSupportRows.map((row) => (
+            <div className="format-matrix__row" key={row.format}>
+              <strong>{row.format}</strong>
+              <span>{row.create}</span>
+              <span>{row.extract}</span>
+              <span>{row.notes}</span>
             </div>
           ))}
         </div>

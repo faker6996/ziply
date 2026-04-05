@@ -28,4 +28,8 @@
   .primary-button {
     width: 100%;
   }
+
+  .format-matrix__row {
+    min-width: 760px;
+  }
 }

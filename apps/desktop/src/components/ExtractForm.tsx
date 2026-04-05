@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useDeferredValue, useState, type FormEvent } from 'react'
 import { conflictPolicyOptions } from '../app/defaults'
 import type {
   ActionFeedback,
@@ -15,18 +15,28 @@ interface ExtractFormProps {
   extractDestination: string
   extractConflictPolicy: ConflictPolicy
   extractPassword: string
+  selectedEntries: string[]
   capabilities: ArchiveCapabilities
   feedback: ActionFeedback
   preview: ArchivePreviewResult | null
+  previewLimit: number
   previewStatus: 'idle' | 'loading' | 'ready' | 'error'
   previewError: string
   supportsPasswordOnExtract: (path: string) => boolean
+  supportsSelectiveExtract: (path: string) => boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
+  onSubmitAll: (event?: FormEvent<HTMLFormElement>) => void | Promise<void>
+  onSubmitSelected: () => void | Promise<void>
   onQueue: () => void
+  onQueueAll: () => void
   onExtractSourceChange: (value: string) => void
   onExtractDestinationChange: (value: string) => void
   onExtractConflictPolicyChange: (value: ConflictPolicy) => void
   onExtractPasswordChange: (value: string) => void
+  onToggleEntry: (path: string) => void
+  onSelectAllVisibleEntries: (paths?: string[]) => void
+  onClearSelection: () => void
+  onLoadMoreEntries: () => void
   onPickExtractSource: () => void
   onPickExtractDestination: () => void
 }
@@ -37,21 +47,40 @@ export function ExtractForm({
   extractDestination,
   extractConflictPolicy,
   extractPassword,
+  selectedEntries,
   capabilities,
   feedback,
   preview,
+  previewLimit,
   previewStatus,
   previewError,
   supportsPasswordOnExtract,
+  supportsSelectiveExtract,
   onSubmit,
+  onSubmitAll,
+  onSubmitSelected,
   onQueue,
+  onQueueAll,
   onExtractSourceChange,
   onExtractDestinationChange,
   onExtractConflictPolicyChange,
   onExtractPasswordChange,
+  onToggleEntry,
+  onSelectAllVisibleEntries,
+  onClearSelection,
+  onLoadMoreEntries,
   onPickExtractSource,
   onPickExtractDestination,
 }: ExtractFormProps) {
+  const [previewQuery, setPreviewQuery] = useState('')
+  const deferredPreviewQuery = useDeferredValue(previewQuery.trim().toLowerCase())
+  const canSelectEntries = preview != null && supportsSelectiveExtract(extractSource)
+  const hasSelection = selectedEntries.length > 0
+  const filteredEntries =
+    !preview || deferredPreviewQuery.length === 0
+      ? preview?.visibleEntries ?? []
+      : preview.visibleEntries.filter((entry) => entry.path.toLowerCase().includes(deferredPreviewQuery))
+
   return (
     <form className="feature-card feature-card--extract tool-card" onSubmit={onSubmit}>
       <div className="tool-card__header">
@@ -173,6 +202,30 @@ export function ExtractForm({
           ) : null}
         </div>
 
+        {canSelectEntries ? (
+          <div className="archive-preview__actions">
+            <span className="chip chip--warm">{selectedEntries.length} selected</span>
+            <span className="chip chip--soft">{filteredEntries.length} visible</span>
+            <button
+              className="ghost-button"
+              onClick={() => {
+                onSelectAllVisibleEntries(filteredEntries.map((entry) => entry.path))
+              }}
+              type="button"
+            >
+              Select all visible
+            </button>
+            <button
+              className="ghost-button"
+              disabled={selectedEntries.length === 0}
+              onClick={onClearSelection}
+              type="button"
+            >
+              Clear selection
+            </button>
+          </div>
+        ) : null}
+
         {previewStatus === 'error' ? (
           <p className="inline-note inline-note--warning">{previewError}</p>
         ) : null}
@@ -180,18 +233,70 @@ export function ExtractForm({
         {preview ? (
           <>
             {preview.note ? <p className="archive-preview__note">{preview.note}</p> : null}
+            <label className="field">
+              <span>Find entry</span>
+              <input
+                className="text-input"
+                onChange={(event) => {
+                  setPreviewQuery(event.target.value)
+                }}
+                placeholder="Filter by path or file name"
+                type="text"
+                value={previewQuery}
+              />
+              <small>
+                {deferredPreviewQuery
+                  ? `${filteredEntries.length} of ${preview.visibleEntries.length} loaded entries match this filter.`
+                  : `Search filters the ${preview.visibleEntries.length} entries currently loaded in this preview panel.`}
+              </small>
+            </label>
+            {!supportsSelectiveExtract(extractSource) && preview.format ? (
+              <p className="archive-preview__note">
+                Selective extract is currently available for zip, tar, tar.gz, tar.xz, and 7z.
+              </p>
+            ) : null}
             <div className="archive-preview__list">
-              {preview.visibleEntries.map((entry) => (
-                <div className="archive-preview__item" key={`${entry.kind}-${entry.path}`}>
-                  <strong>{entry.path}</strong>
-                  <span>{archivePreviewSummary(entry)}</span>
-                </div>
+              {filteredEntries.map((entry) => (
+                <label className="archive-preview__item" key={`${entry.kind}-${entry.path}`}>
+                  {canSelectEntries ? (
+                    <input
+                      checked={selectedEntries.includes(entry.path)}
+                      className="archive-preview__checkbox"
+                      onChange={() => {
+                        onToggleEntry(entry.path)
+                      }}
+                      type="checkbox"
+                    />
+                  ) : null}
+                  <div className="archive-preview__copy">
+                    <strong>{entry.path}</strong>
+                    <span>{archivePreviewSummary(entry)}</span>
+                  </div>
+                </label>
               ))}
             </div>
-            {preview.hiddenEntryCount > 0 ? (
+            {filteredEntries.length === 0 ? (
               <p className="archive-preview__meta">
-                + {preview.hiddenEntryCount} more entries hidden from this preview.
+                No loaded entries match the current search filter.
               </p>
+            ) : null}
+            {preview.hiddenEntryCount > 0 ? (
+              <div className="archive-preview__footer">
+                <p className="archive-preview__meta">
+                  + {preview.hiddenEntryCount} more entries hidden from this preview. Selective
+                  extract only applies to the entries currently loaded here.
+                </p>
+                <button
+                  className="ghost-button"
+                  disabled={previewStatus === 'loading'}
+                  onClick={onLoadMoreEntries}
+                  type="button"
+                >
+                  {previewStatus === 'loading'
+                    ? 'Loading more...'
+                    : `Load ${Math.min(160, preview.totalEntries - previewLimit)} more`}
+                </button>
+              </div>
             ) : null}
           </>
         ) : null}
@@ -202,9 +307,26 @@ export function ExtractForm({
           <button
             className="primary-button primary-button--cool"
             disabled={feedback.status === 'running'}
-            type="submit"
+            onClick={() => {
+              void onSubmitSelected()
+            }}
+            type="button"
           >
-            {feedback.status === 'running' ? 'Extracting...' : 'Extract archive'}
+            {feedback.status === 'running'
+              ? 'Extracting...'
+              : hasSelection
+                ? `Extract selected (${selectedEntries.length})`
+                : 'Extract archive'}
+          </button>
+          <button
+            className="ghost-button"
+            disabled={!desktopShell || feedback.status === 'running' || !hasSelection}
+            onClick={() => {
+              void onSubmitAll()
+            }}
+            type="button"
+          >
+            Extract all
           </button>
           <button
             className="ghost-button"
@@ -212,7 +334,15 @@ export function ExtractForm({
             onClick={onQueue}
             type="button"
           >
-            Add to queue
+            {hasSelection ? 'Queue selected' : 'Add to queue'}
+          </button>
+          <button
+            className="ghost-button"
+            disabled={!desktopShell || !hasSelection}
+            onClick={onQueueAll}
+            type="button"
+          >
+            Queue all
           </button>
         </div>
         <ActionBanner feedback={feedback} />

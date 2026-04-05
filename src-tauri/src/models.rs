@@ -41,6 +41,8 @@ pub(crate) struct ExtractRequest {
     pub(crate) conflict_policy: Option<String>,
     #[serde(default)]
     pub(crate) password: Option<String>,
+    #[serde(default)]
+    pub(crate) selected_entries: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -49,6 +51,8 @@ pub(crate) struct ArchivePreviewRequest {
     pub(crate) archive_path: String,
     #[serde(default)]
     pub(crate) password: Option<String>,
+    #[serde(default)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Serialize)]
