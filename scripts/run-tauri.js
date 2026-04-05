@@ -13,6 +13,7 @@ if (tauriArgs.length === 0) {
 }
 
 const repoRoot = join(__dirname, "..");
+const tauriConfigPath = join(repoRoot, "src-tauri", "tauri.conf.json");
 const cargoBinDirectory = join(homedir(), ".cargo", "bin");
 const envWithCargo = {
   ...process.env,
@@ -37,11 +38,11 @@ if (process.platform !== "win32") {
   }
 
   const command = [
-    `call "${vsDevCmd}" -arch=x64 -host_arch=x64 >nul`,
-    `set "PATH=${cargoBinDirectory};%PATH%"`,
-    windowsNpmExecCommand(
-      `exec --workspace @ziply/desktop tauri -- ${toCmdArgsString(tauriArgs)} --config src-tauri/tauri.conf.json`,
-    ),
+      `call "${vsDevCmd}" -arch=x64 -host_arch=x64 >nul`,
+      `set "PATH=${cargoBinDirectory};%PATH%"`,
+      windowsNpmExecCommand(
+        `exec --workspace @ziply/desktop tauri -- ${toCmdArgsString(tauriArgs)} --config ${quoteForCmd(tauriConfigPath)}`,
+      ),
   ].join(" && ");
 
   const child = spawn("cmd.exe", ["/d", "/c", command], {
@@ -74,7 +75,7 @@ function runNpmExecTauri(env) {
       "--",
       ...tauriArgs,
       "--config",
-      "src-tauri/tauri.conf.json",
+      tauriConfigPath,
     ],
     {
       cwd: repoRoot,
