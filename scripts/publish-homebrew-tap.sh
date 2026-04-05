@@ -116,7 +116,7 @@ fi
 
 pushd "$TAP_DIR" >/dev/null
 
-if git diff --quiet -- Casks/ziply.rb README.md .github/workflows/validate-cask.yml; then
+if [[ -z "$(git status --porcelain -- Casks/ziply.rb README.md .github/workflows/validate-cask.yml)" ]]; then
   echo "Homebrew tap is already up to date."
   exit 0
 fi
