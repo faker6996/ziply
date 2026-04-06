@@ -434,7 +434,7 @@ fn install_macos_quick_action(
     definition: MacOsQuickActionDefinition,
 ) -> Result<(), String> {
     let workflow_dir = services_dir.join(definition.workflow_name);
-    let resources_dir = workflow_dir.join("Contents/Resources");
+    let contents_dir = workflow_dir.join("Contents");
 
     if workflow_dir.exists() {
         fs::remove_dir_all(&workflow_dir).map_err(|error| {
@@ -445,10 +445,10 @@ fn install_macos_quick_action(
         })?;
     }
 
-    fs::create_dir_all(&resources_dir).map_err(|error| {
+    fs::create_dir_all(&contents_dir).map_err(|error| {
         format!(
-            "failed to create workflow resources directory {}: {error}",
-            resources_dir.display()
+            "failed to create workflow contents directory {}: {error}",
+            contents_dir.display()
         )
     })?;
 
@@ -470,7 +470,7 @@ fn install_macos_quick_action(
     })?;
 
     let document_wflow = macos_quick_action_document_wflow(executable, definition.cli_flag);
-    fs::write(resources_dir.join("document.wflow"), document_wflow).map_err(|error| {
+    fs::write(contents_dir.join("document.wflow"), document_wflow).map_err(|error| {
         format!(
             "failed to write workflow document.wflow for {}: {error}",
             definition.menu_title
@@ -790,5 +790,37 @@ mod tests {
         assert!(document.contains("--extract-here"));
         assert!(document.contains("/System/Library/Automator/Run Shell Script.action"));
         assert!(document.contains("<string>public.archive</string>"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_installer_places_document_wflow_in_contents_directory() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "ziply-shell-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&temp_dir).expect("create temp services directory");
+
+        install_macos_quick_action(
+            &temp_dir,
+            Path::new("/Applications/Ziply.app/Contents/MacOS/ziply-desktop"),
+            MacOsQuickActionDefinition {
+                workflow_name: "Extract with Ziply.workflow",
+                bundle_identifier: "com.tranvanbach.ziply.service.extract",
+                menu_title: "Extract with Ziply",
+                cli_flag: "--extract",
+            },
+        )
+        .expect("install quick action");
+
+        let workflow_dir = temp_dir.join("Extract with Ziply.workflow/Contents");
+        assert!(workflow_dir.join("document.wflow").is_file());
+        assert!(workflow_dir.join("Info.plist").is_file());
+        assert!(workflow_dir.join("version.plist").is_file());
+
+        fs::remove_dir_all(&temp_dir).expect("cleanup temp services directory");
     }
 }
