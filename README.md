@@ -2,7 +2,7 @@
 
 Ziply is a cross-platform desktop archive utility for macOS, Windows, and Linux. It focuses on fast compress and extract workflows, archive preview, selective extract, live job tracking, and release packaging from one Tauri + React codebase.
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/github/v/tag/faker6996/ziply?label=version)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 ![CI](https://img.shields.io/github/actions/workflow/status/faker6996/ziply/ci.yml?branch=main&label=ci)
@@ -251,6 +251,7 @@ Ziply ships with two workflows:
 - `build-installers.yml`
   - Checks version consistency before building installers
   - Builds DMG, NSIS, and DEB installers
+  - Signs and notarizes the macOS DMG when Apple release secrets are configured, otherwise falls back to an unsigned DMG for internal testing
   - Verifies installer artifacts exist, are non-empty, and have the expected file type before upload
   - Uploads installer artifacts
   - Auto-tags the current app version from `main`
@@ -259,10 +260,31 @@ Ziply ships with two workflows:
   - Updates the Homebrew tap when Homebrew credentials are configured
   - Publishes the APT repository to GitHub Pages when APT signing secrets are configured
 
+### macOS signing and notarization
+
+To produce a macOS build that opens without Gatekeeper warnings, configure these GitHub Actions secrets:
+
+- `APPLE_CERTIFICATE`: base64-encoded `Developer ID Application` `.p12`
+- `APPLE_CERTIFICATE_PASSWORD`: password used to export the `.p12`
+- `APPLE_API_KEY`: App Store Connect API key ID
+- `APPLE_API_ISSUER`: App Store Connect issuer ID
+- `APPLE_API_KEY_BASE64`: base64-encoded `AuthKey_<KEYID>.p8`
+- `APPLE_SIGNING_IDENTITY`: optional explicit signing identity override
+
+With those secrets present, `build-installers.yml` builds a signed universal app, notarizes it with Apple, staples both the `.app` and `.dmg`, and only then uploads the release artifact.
+
+Without them, the workflow still builds a macOS DMG, but it is intentionally unsigned and will trigger Gatekeeper warnings after download or Homebrew install.
+
 ### Release Configuration
 
 Repository secrets used by packaging:
 
+- `APPLE_CERTIFICATE`
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_API_KEY`
+- `APPLE_API_ISSUER`
+- `APPLE_API_KEY_BASE64`
+- `APPLE_SIGNING_IDENTITY` (optional)
 - `HOMEBREW_TAP_TOKEN`
 - `APT_GPG_PRIVATE_KEY`
 - `APT_GPG_PASSPHRASE`
@@ -274,7 +296,8 @@ Repository variables used by packaging:
 
 GitHub Pages must also be enabled for the repository if you want the APT publish step to deploy.
 
-If those values are missing, installer builds and the GitHub Release can still run, but feed publication steps are skipped.
+If the Apple secrets are missing, the macOS release artifact is still built but remains unsigned.
+If the Homebrew or APT secrets are missing, installer builds and the GitHub Release can still run, but feed publication steps are skipped.
 
 ## Validation Status
 
@@ -290,7 +313,7 @@ Current local status:
 
 - `npm run lint` passes
 - `npm run build:web` passes
-- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `45` tests
+- `cargo test --manifest-path src-tauri/Cargo.toml` passes with `49` tests
 - `bash scripts/check-version-consistency.sh` passes
 - compatibility fixtures can be regenerated locally with `bash scripts/generate-compat-fixtures.sh`
 

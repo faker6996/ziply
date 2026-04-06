@@ -23,7 +23,7 @@ jobs:
         include:
           - name: macOS DMG
             platform: macos-latest
-            build_args: "--bundles dmg --target universal-apple-darwin --ci --no-sign"
+            build_args: "--bundles dmg --target universal-apple-darwin --ci"
             artifact_name: ziply-macos-dmg
             artifact_dir: target/universal-apple-darwin/release/bundle/dmg
             artifact_extension: dmg
@@ -46,6 +46,44 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Preflight macOS signing and notarization
+        if: matrix.platform == 'macos-latest'
+        id: macos_signing
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          missing=()
+          for var in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_BASE64; do
+            if [ -z "${!var}" ]; then
+              missing+=("$var")
+            fi
+          done
+
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "macOS signing/notarization secrets missing: ${missing[*]}. Falling back to unsigned DMG."
+            exit 0
+          fi
+
+          api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          APPLE_API_KEY_BASE64="$APPLE_API_KEY_BASE64" APPLE_API_KEY_PATH="$api_key_path" python3 - <<'PY'
+import base64
+import os
+from pathlib import Path
+
+Path(os.environ["APPLE_API_KEY_PATH"]).write_bytes(
+    base64.b64decode(os.environ["APPLE_API_KEY_BASE64"])
+)
+PY
+          chmod 600 "$api_key_path"
+          echo "APPLE_API_KEY_PATH=$api_key_path" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -79,12 +117,57 @@ jobs:
         run: bash scripts/check-version-consistency.sh
 
       - name: Build installer
-        run: npm run build -- ${{ matrix.build_args }}
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          build_args="${{ matrix.build_args }}"
+          if [ "${{ matrix.platform }}" = "macos-latest" ] && [ "${{ steps.macos_signing.outputs.ready }}" != "true" ]; then
+            build_args="$build_args --no-sign"
+          fi
+
+          npm run build -- $build_args
 
       - name: Show bundle outputs
         if: always()
         shell: bash
         run: find target -type f | sort | grep '/bundle/' || true
+
+      - name: Staple and verify macOS artifacts
+        if: matrix.platform == 'macos-latest' && steps.macos_signing.outputs.ready == 'true'
+        shell: bash
+        run: |
+          APP_PATH="$(find target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -type d -name '*.app' | head -n 1)"
+          DMG_PATH="$(find target/universal-apple-darwin/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "Signed app bundle not found."
+            exit 1
+          fi
+
+          if [ -z "$DMG_PATH" ] || [ ! -f "$DMG_PATH" ]; then
+            echo "Signed DMG not found."
+            exit 1
+          fi
+
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+          codesign -dv --verbose=4 "$APP_PATH"
+          spctl -a -t exec -vv "$APP_PATH"
+
+      - name: Clean up macOS notarization key
+        if: matrix.platform == 'macos-latest' && always()
+        shell: bash
+        run: |
+          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+            rm -f "$APPLE_API_KEY_PATH"
+          fi
 
       - name: Verify installer artifact
         shell: bash
