@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Ziply",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "com.tranvanbach.ziply",
   "build": {
     "beforeDevCommand": "npm run dev --workspace @ziply/desktop",
@@ -44,6 +44,7 @@
     "license": "MIT",
     "licenseFile": "../LICENSE",
     "category": "Utility",
+    "resources": ["resources/macos-services"],
     "fileAssociations": [
       {
         "ext": ["zip"],

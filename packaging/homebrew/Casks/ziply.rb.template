@@ -14,11 +14,39 @@ cask "ziply" do
 
   depends_on macos: "__MACOS_REQUIREMENT__"
 
+  preflight do
+    shell_single_quote = lambda do |value|
+      quoted = "'#{value.gsub("'", %q('"'"'))}'"
+      quoted.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+    end
+
+    app_binary = appdir.join("Ziply.app/Contents/MacOS/ziply-desktop").to_s
+    resources_dir = staged_path.join("Ziply.app/Contents/Resources/macos-services")
+
+    [
+      "extract-with-ziply.workflow",
+      "extract-here-with-ziply.workflow",
+    ].each do |workflow_name|
+      document = resources_dir.join(workflow_name, "Contents", "document.wflow")
+      next unless document.exist?
+
+      document.write(
+        document.read.gsub("__ZIPLY_EXECUTABLE__", shell_single_quote.call(app_binary)),
+      )
+    end
+  end
+
   app "Ziply.app"
+  artifact "Ziply.app/Contents/Resources/macos-services/extract-with-ziply.workflow",
+           target: "~/Library/Services/Extract with Ziply.workflow"
+  artifact "Ziply.app/Contents/Resources/macos-services/extract-here-with-ziply.workflow",
+           target: "~/Library/Services/Extract here with Ziply.workflow"
 
   zap trash: [
     "~/Library/Application Support/com.tranvanbach.ziply",
     "~/Library/Caches/com.tranvanbach.ziply",
+    "~/Library/Services/Extract with Ziply.workflow",
+    "~/Library/Services/Extract here with Ziply.workflow",
     "~/Library/Preferences/com.tranvanbach.ziply.plist",
     "~/Library/Saved Application State/com.tranvanbach.ziply.savedState",
   ]
