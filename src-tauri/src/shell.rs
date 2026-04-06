@@ -435,6 +435,7 @@ fn install_macos_quick_action(
 ) -> Result<(), String> {
     let workflow_dir = services_dir.join(definition.workflow_name);
     let contents_dir = workflow_dir.join("Contents");
+    let resources_dir = contents_dir.join("Resources");
 
     if workflow_dir.exists() {
         fs::remove_dir_all(&workflow_dir).map_err(|error| {
@@ -445,7 +446,7 @@ fn install_macos_quick_action(
         })?;
     }
 
-    fs::create_dir_all(&contents_dir).map_err(|error| {
+    fs::create_dir_all(&resources_dir).map_err(|error| {
         format!(
             "failed to create workflow contents directory {}: {error}",
             contents_dir.display()
@@ -470,7 +471,7 @@ fn install_macos_quick_action(
     })?;
 
     let document_wflow = macos_quick_action_document_wflow(executable, definition.cli_flag);
-    fs::write(contents_dir.join("document.wflow"), document_wflow).map_err(|error| {
+    fs::write(resources_dir.join("document.wflow"), document_wflow).map_err(|error| {
         format!(
             "failed to write workflow document.wflow for {}: {error}",
             definition.menu_title
@@ -794,7 +795,7 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn macos_installer_places_document_wflow_in_contents_directory() {
+    fn macos_installer_places_document_wflow_in_resources_directory() {
         let temp_dir = std::env::temp_dir().join(format!(
             "ziply-shell-test-{}",
             std::time::SystemTime::now()
@@ -817,7 +818,7 @@ mod tests {
         .expect("install quick action");
 
         let workflow_dir = temp_dir.join("Extract with Ziply.workflow/Contents");
-        assert!(workflow_dir.join("document.wflow").is_file());
+        assert!(workflow_dir.join("Resources/document.wflow").is_file());
         assert!(workflow_dir.join("Info.plist").is_file());
         assert!(workflow_dir.join("version.plist").is_file());
 

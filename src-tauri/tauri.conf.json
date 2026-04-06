@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Ziply",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "identifier": "com.tranvanbach.ziply",
   "build": {
     "beforeDevCommand": "npm run dev --workspace @ziply/desktop",

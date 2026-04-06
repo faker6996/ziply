@@ -27,7 +27,7 @@ cask "ziply" do
       "extract-with-ziply.workflow",
       "extract-here-with-ziply.workflow",
     ].each do |workflow_name|
-      document = resources_dir.join(workflow_name, "Contents", "document.wflow")
+      document = resources_dir.join(workflow_name, "Contents", "Resources", "document.wflow")
       next unless document.exist?
 
       document.write(
