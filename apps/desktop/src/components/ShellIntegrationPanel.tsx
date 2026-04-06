@@ -49,7 +49,7 @@ export function ShellIntegrationPanel({
         <p>
           Windows installs Explorer commands for `Extract with Ziply`, `Extract here with Ziply`,
           and `Compress with Ziply`. Linux installs desktop actions for supporting file managers.
-          macOS currently relies on file associations and `Open With Ziply`.
+          macOS installs Finder Quick Actions for `Extract with Ziply` and `Extract here with Ziply`.
         </p>
       </div>
       <ActionBanner feedback={feedback} />

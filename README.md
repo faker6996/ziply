@@ -116,7 +116,7 @@ For extraction, conflict handling currently applies at the destination level, no
 
 - Windows: Explorer context commands are implemented for extract, extract-here, and compress flows
 - Linux: desktop action integration is implemented for compatible launchers and file managers
-- macOS: file association and `Open With Ziply` are supported through the bundle; custom Finder right-click actions are not fully shipped yet
+- macOS: Finder Quick Actions are available for `Extract with Ziply` and `Extract here with Ziply`; `Open With Ziply` remains available through the bundle
 
 ### Packaging
 
@@ -134,7 +134,7 @@ For extraction, conflict handling currently applies at the destination level, no
 - `rar` archive creation is not shipped because the current native Rust stack in Ziply is read-side only
 - `gz`, `xz`, and `bz2` preview are single-stream oriented and selective extract is not applicable
 - Batch jobs currently run one at a time
-- Finder-specific custom context-menu actions on macOS still need a dedicated extension or Quick Action path
+- Finder Quick Actions on macOS cover extract and extract-here flows; a deeper Finder extension path is still open for future expansion
 
 ## Quick Start
 
