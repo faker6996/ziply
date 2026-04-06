@@ -21,7 +21,9 @@ use crate::{
 #[cfg(target_os = "macos")]
 use crate::{
     archive::{is_supported_archive_path, path_to_string},
-    shell::shell_extract_intent,
+    shell::{
+        current_shell_integration_status, install_current_shell_integration, shell_extract_intent,
+    },
 };
 
 pub fn run() {
@@ -30,6 +32,12 @@ pub fn run() {
             collect_launch_shell_intents(),
         )))
         .plugin(tauri_plugin_dialog::init())
+        .setup(|_app| {
+            #[cfg(target_os = "macos")]
+            ensure_macos_shell_integration_installed();
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             metadata_commands::app_overview,
             metadata_commands::archive_capabilities,
@@ -46,6 +54,18 @@ pub fn run() {
         .expect("failed to build Ziply");
 
     app.run(handle_run_event);
+}
+
+#[cfg(target_os = "macos")]
+fn ensure_macos_shell_integration_installed() {
+    let status = current_shell_integration_status();
+    if !status.supported || !status.can_install || status.installed {
+        return;
+    }
+
+    if let Err(error) = install_current_shell_integration() {
+        eprintln!("failed to auto-install macOS shell integration: {error}");
+    }
 }
 
 #[cfg(target_os = "macos")]
