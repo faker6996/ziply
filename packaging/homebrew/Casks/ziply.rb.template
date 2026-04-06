@@ -37,10 +37,28 @@ cask "ziply" do
   end
 
   app "Ziply.app"
-  artifact "Ziply.app/Contents/Resources/macos-services/extract-with-ziply.workflow",
-           target: "~/Library/Services/Extract with Ziply.workflow"
-  artifact "Ziply.app/Contents/Resources/macos-services/extract-here-with-ziply.workflow",
-           target: "~/Library/Services/Extract here with Ziply.workflow"
+
+  postflight do
+    services_dir = Pathname.new(File.expand_path("~/Library/Services"))
+    services_dir.mkpath
+
+    {
+      "extract-with-ziply.workflow" => "Extract with Ziply.workflow",
+      "extract-here-with-ziply.workflow" => "Extract here with Ziply.workflow",
+    }.each do |source_name, target_name|
+      source = appdir.join("Ziply.app/Contents/Resources/macos-services", source_name)
+      target = services_dir.join(target_name)
+      next unless source.exist?
+
+      FileUtils.rm_rf(target)
+      FileUtils.cp_r(source, target)
+    end
+  end
+
+  uninstall_postflight do
+    FileUtils.rm_rf(File.expand_path("~/Library/Services/Extract with Ziply.workflow"))
+    FileUtils.rm_rf(File.expand_path("~/Library/Services/Extract here with Ziply.workflow"))
+  end
 
   zap trash: [
     "~/Library/Application Support/com.tranvanbach.ziply",
